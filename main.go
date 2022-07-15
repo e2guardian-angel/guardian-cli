@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/alecthomas/kong"
 	"github.com/e2guardian-angel/guardian-cli/utils"
 )
@@ -13,11 +15,14 @@ var CLI struct {
 }
 
 func main() {
+	var code int = 0
 	ctx := kong.Parse(&CLI)
 	switch ctx.Command() {
 	case "setup <host>":
-		utils.Setup(CLI.Setup.Host, CLI.Setup.Port)
+		code = utils.Setup(CLI.Setup.Host, CLI.Setup.Port)
 	default:
 		panic(ctx.Command())
 	}
+
+	os.Exit(code)
 }

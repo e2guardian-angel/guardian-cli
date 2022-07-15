@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path"
 
@@ -10,7 +11,7 @@ import (
 
 const playbookGit = "https://github.com/e2guardian-angel/guardian-playbook.git"
 
-func Setup(host string, port int16) {
+func Setup(host string, port int16) int {
 
 	var guardianHome string = os.Getenv("GUARDIAN_HOME")
 	var homePath string
@@ -25,14 +26,31 @@ func Setup(host string, port int16) {
 	os.RemoveAll(playbookDirs)
 	os.MkdirAll(playbookDirs, 0o755)
 
-	fmt.Printf("Cloning playbooks into \"%s\"...", playbookDirs)
+	log.Printf("Cloning playbooks into \"%s\"...\n", playbookDirs)
 	_, err := git.PlainClone(playbookDirs, false, &git.CloneOptions{
 		URL:      playbookGit,
 		Progress: os.Stdout,
 	})
 
 	if err != nil {
-		fmt.Println("Failed to clone playbooks: ", err)
+		log.Fatal("Failed to clone playbooks: ", err)
+		return -1
 	}
+
+	// Create hosts file
+	f, err := os.Create(path.Join(playbookDirs, "hosts.yml"))
+	if err != nil {
+		log.Fatal(err)
+		return -1
+	}
+
+	defer f.Close()
+
+	f.WriteString(fmt.Sprintf("[%s]\n", host))
+	f.WriteString(fmt.Sprintf("%s:%d\n", host, port))
+
+	log.Printf("Executing playbook on target host \"%s\"...\n", host)
+
+	return 0
 
 }
