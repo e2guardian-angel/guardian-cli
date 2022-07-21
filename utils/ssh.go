@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"path"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 /*
@@ -132,21 +134,55 @@ func InitSsh(bitSize int) error {
 	return nil
 }
 
+func knownHostContains(line string) (error, bool) {
+	knownHostsFile, err := ioutil.ReadFile(getKnownHostsFile())
+	if err != nil {
+		log.Fatal("Failed to read known_hosts file: ", err)
+		return err, false
+	}
+	contents := string(knownHostsFile)
+	// //check whether s contains substring text
+	return nil, strings.Contains(contents, line)
+}
+
+func appendToKnownHosts(line string) error {
+	knownHostsFile := getKnownHostsFile()
+	f, err := os.OpenFile(knownHostsFile, os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatal("Failed to open known_hosts file: ", err)
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(line)
+	if err != nil {
+		log.Fatal("Failed to append to known_hosts file: ", err)
+		return err
+	}
+	return nil
+}
+
+// Host key callback to accept first key
+func AcceptFirstKey(hostname string, remote net.Addr, key ssh.PublicKey) error {
+	line := knownhosts.Line([]string{hostname}, key)
+	err, exists := knownHostContains(line)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		err = appendToKnownHosts(line)
+	}
+	return err
+}
+
 func copySshKeys(host Host, noPassword bool) error {
 	err := InitSsh(4096)
 	if err != nil {
 		return err
 	}
 
-	/*hostKeyCallback, err := knownhosts.New(getKnownHostsFile())
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}*/
-
 	var sshConfig ssh.ClientConfig
 	if noPassword {
-		// Use key auth
+		// TODO: support key auth
 	} else {
 		// Use password auth
 		password, err := getUserCredentials()
@@ -159,7 +195,7 @@ func copySshKeys(host Host, noPassword bool) error {
 			Auth: []ssh.AuthMethod{
 				ssh.Password(password),
 			},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			HostKeyCallback: AcceptFirstKey,
 		}
 	}
 

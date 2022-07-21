@@ -145,13 +145,13 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 	}
 
 	newHost := Host{name, host, username, port}
-	config.Hosts = append(config.Hosts, newHost)
-	err = writeConfig(config)
+	err = copySshKeys(newHost, noPassword)
 	if err != nil {
 		return -1
 	}
 
-	err = copySshKeys(newHost, noPassword)
+	config.Hosts = append(config.Hosts, newHost)
+	err = writeConfig(config)
 	if err != nil {
 		return -1
 	}
@@ -217,12 +217,12 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 		return -1
 	}
 
-	err = writeConfig(config)
+	err = copySshKeys(host, noPassword)
 	if err != nil {
 		return -1
 	}
 
-	err = copySshKeys(host, noPassword)
+	err = writeConfig(config)
 	if err != nil {
 		return -1
 	}
