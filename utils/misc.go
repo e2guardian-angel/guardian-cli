@@ -1,9 +1,13 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"runtime"
+	"syscall"
+
+	"golang.org/x/term"
 )
 
 func UserHomeDir() string {
@@ -26,4 +30,20 @@ func GuardianConfigHome() string {
 		homePath = path.Join(UserHomeDir(), ".guardian")
 	}
 	return homePath
+}
+
+/*
+ * Receive password from the command line
+ */
+func getUserCredentials() (string, error) {
+
+	fmt.Print("Enter Password: ")
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("")
+
+	password := string(bytePassword)
+	return password, nil
 }

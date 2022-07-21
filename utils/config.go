@@ -15,9 +15,10 @@ import (
  */
 
 type Host struct {
-	Name    string
-	Address string
-	Port    uint16
+	Name     string
+	Address  string
+	Username string
+	Port     uint16
 }
 
 type Configuration struct {
@@ -124,7 +125,7 @@ func initLocal() error {
 /*
  * setup a new target host
  */
-func AddHost(name string, host string, port uint16) int {
+func AddHost(name string, host string, port uint16, username string, noPassword bool) int {
 
 	err := initLocal()
 	if err != nil {
@@ -143,8 +144,14 @@ func AddHost(name string, host string, port uint16) int {
 		return -1
 	}
 
-	config.Hosts = append(config.Hosts, Host{name, host, port})
+	newHost := Host{name, host, username, port}
+	config.Hosts = append(config.Hosts, newHost)
 	err = writeConfig(config)
+	if err != nil {
+		return -1
+	}
+
+	err = copySshKeys(newHost, noPassword)
 	if err != nil {
 		return -1
 	}
@@ -187,7 +194,7 @@ func DeleteHost(name string) int {
 /*
  * Update a target host
  */
-func UpdateHost(name string, host Host) int {
+func UpdateHost(name string, host Host, noPassword bool) int {
 
 	err := initLocal()
 	if err != nil {
@@ -211,6 +218,11 @@ func UpdateHost(name string, host Host) int {
 	}
 
 	err = writeConfig(config)
+	if err != nil {
+		return -1
+	}
+
+	err = copySshKeys(host, noPassword)
 	if err != nil {
 		return -1
 	}
