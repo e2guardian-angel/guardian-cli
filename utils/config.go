@@ -156,7 +156,7 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 		return -1
 	}
 
-	fmt.Println("Successfully added host '", name, "' as a target.")
+	fmt.Printf("Successfully added host '%s' as a target.\n", host)
 	return 0
 
 }
@@ -186,7 +186,7 @@ func DeleteHost(name string) int {
 		return -1
 	}
 
-	fmt.Println("Successfully deleted host '", name, "' from targets.")
+	fmt.Printf("Successfully deleted host '%s' from targets.\n", name)
 	return 0
 
 }
@@ -213,7 +213,7 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 		newHosts = append(newHosts, config.Hosts[index+1:]...)
 		config.Hosts = newHosts
 	} else {
-		fmt.Println("No target '", name, "' exists. Add it first.")
+		fmt.Printf("No target '%s' exists. Add it first.\n", name)
 		return -1
 	}
 
@@ -227,7 +227,7 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 		return -1
 	}
 
-	fmt.Println("Successfully update host '", name, "' in targets.")
+	fmt.Printf("Successfully update host '%s' in targets.\n", name)
 	return 0
 
 }

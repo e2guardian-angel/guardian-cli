@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,6 +15,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/manifoldco/promptui"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
@@ -161,9 +164,38 @@ func appendToKnownHosts(line string) error {
 	return nil
 }
 
+// hexadecimal md5 hash grouped by 2 characters separated by colons
+// Copy/pasted from: https://github.com/golang/go/issues/12292#issuecomment-255588529
+func FingerprintMD5(key ssh.PublicKey) string {
+	hash := md5.Sum(key.Marshal())
+	out := ""
+	for i := 0; i < 16; i++ {
+		if i > 0 {
+			out += ":"
+		}
+		out += fmt.Sprintf("%02x", hash[i]) // don't forget the leading zeroes
+	}
+	return out
+}
+
 // Host key callback to accept first key
-func AcceptFirstKey(hostname string, remote net.Addr, key ssh.PublicKey) error {
+func PromptAtKey(hostname string, remote net.Addr, key ssh.PublicKey) error {
 	line := knownhosts.Line([]string{hostname}, key)
+
+	fingerprint := FingerprintMD5(key)
+
+	fmt.Printf("Remote target '%s' sent public key with fingerprint: %s\n", hostname, fingerprint)
+	prompt := promptui.Select{
+		Label: "Do you wish to accept this key and continue? (yes/no)",
+		Items: []string{"yes", "no"},
+	}
+	_, result, err := prompt.Run()
+	if err != nil {
+		return err
+	} else if result == "no" {
+		return errors.New("User rejected public key.")
+	}
+
 	err, exists := knownHostContains(line)
 	if err != nil {
 		return err
@@ -195,7 +227,7 @@ func copySshKeys(host Host, noPassword bool) error {
 			Auth: []ssh.AuthMethod{
 				ssh.Password(password),
 			},
-			HostKeyCallback: AcceptFirstKey,
+			HostKeyCallback: PromptAtKey,
 		}
 	}
 
@@ -298,4 +330,47 @@ func writeKeyToFile(keyBytes []byte, saveFileTo string) error {
 	}
 
 	return nil
+}
+
+/*
+ * Reset SSH and delete all hosts
+ */
+func ResetSsh() int {
+	fmt.Println("!!! WARNING !!! This will reset your SSH keys and delete all of your target hosts.")
+	prompt := promptui.Select{
+		Label: "Are you sure you want to proceed? (yes/no)",
+		Items: []string{"yes", "no"},
+	}
+
+	_, result, err := prompt.Run()
+	if err != nil {
+
+		log.Fatal("Error receiving prompt: ", err)
+		return -1
+
+	} else if result == "no" {
+
+		return 0
+
+	} else {
+
+		err := os.RemoveAll(getSshKeysDir())
+		if err != nil {
+			return -1
+		}
+
+		err, config := loadConfig()
+		if err != nil {
+			return -1
+		}
+
+		// delete hosts
+		config.Hosts = nil
+		err = writeConfig(config)
+		if err != nil {
+			return -1
+		}
+
+		return 0
+	}
 }
