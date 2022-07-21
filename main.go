@@ -16,6 +16,7 @@ var CLI struct {
 			Username   string `arg name:"username" help:"Username for SSH login"`
 			Port       uint16 `default:22 help:"SSH port"`
 			NoPassword bool   `default:false help:"Don't use password auth for SSH key exchange"`
+			HomePath   string `help:"Custom home path on remote target installation"`
 		} `cmd help:"Add a target host for installation"`
 		Update struct {
 			Name       string `arg name:"name" help:"Name of target host to update"`
@@ -23,6 +24,7 @@ var CLI struct {
 			Username   string `arg name:"username" help:"Username for SSH login"`
 			Port       uint16 `default:22 help:"SSH port"`
 			NoPassword bool   `default:false help:"Don't use password auth for SSH key exchange"`
+			HomePath   string `help:"Custom home path on remote target installation"`
 		} `cmd help:"Updates a target host for installation"`
 		Delete struct {
 			Name string `arg name:"name" help:"Name of target host to delete"`
@@ -42,10 +44,10 @@ func main() {
 	ctx := kong.Parse(&CLI)
 	switch ctx.Command() {
 	case "target add <name> <host> <username>":
-		code = utils.AddHost(CLI.Target.Add.Name, CLI.Target.Add.Host, CLI.Target.Add.Port, CLI.Target.Add.Username, CLI.Target.Add.NoPassword)
+		code = utils.AddHost(CLI.Target.Add.Name, CLI.Target.Add.Host, CLI.Target.Add.Port, CLI.Target.Add.Username, CLI.Target.Add.NoPassword, CLI.Target.Add.HomePath)
 		break
 	case "target update <name> <host>":
-		host := utils.Host{CLI.Target.Update.Name, CLI.Target.Update.Host, CLI.Target.Update.Username, CLI.Target.Update.Port}
+		host := utils.Host{CLI.Target.Update.Name, CLI.Target.Update.Host, CLI.Target.Update.Username, CLI.Target.Update.Port, CLI.Target.Update.HomePath}
 		code = utils.UpdateHost(CLI.Target.Update.Name, host, CLI.Target.Update.NoPassword)
 	case "target setup <name>":
 		code = utils.Setup(CLI.Target.Setup.Name)

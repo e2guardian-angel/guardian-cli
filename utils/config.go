@@ -19,6 +19,7 @@ type Host struct {
 	Address  string
 	Username string
 	Port     uint16
+	HomePath string
 }
 
 type Configuration struct {
@@ -125,7 +126,7 @@ func initLocal() error {
 /*
  * setup a new target host
  */
-func AddHost(name string, host string, port uint16, username string, noPassword bool) int {
+func AddHost(name string, host string, port uint16, username string, noPassword bool, homePath string) int {
 
 	err := initLocal()
 	if err != nil {
@@ -144,7 +145,13 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 		return -1
 	}
 
-	newHost := Host{name, host, username, port}
+	var hostHomePath string
+	if homePath != "" {
+		hostHomePath = homePath
+	} else {
+		hostHomePath = fmt.Sprintf("/home/%s", username)
+	}
+	newHost := Host{name, host, username, port, hostHomePath}
 	err = copySshKeys(newHost, noPassword)
 	if err != nil {
 		return -1
