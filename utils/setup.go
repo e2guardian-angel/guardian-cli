@@ -11,23 +11,31 @@ import (
 
 const playbookGit = "https://github.com/e2guardian-angel/guardian-playbook.git"
 
-func Setup(host string, port int16) int {
+func Setup(name string) int {
 
-	var guardianHome string = os.Getenv("GUARDIAN_HOME")
-	var homePath string
-	var playbookDirs string
-	if guardianHome != "" {
-		homePath = path.Join(guardianHome)
-	} else {
-		homePath = path.Join(os.Getenv("HOME"), ".guardian")
+	err := initLocal()
+	if err != nil {
+		return -1
 	}
-	playbookDirs = path.Join(homePath, "playbooks")
+
+	err, config := loadConfig()
+	if err != nil {
+		return -1
+	}
+
+	_, target := FindHost(config, name)
+	if target.Name != name {
+		log.Fatal("Host ", name, " has not been configured. Add it first.")
+		return -1
+	}
+
+	playbookDirs := path.Join(GuardianConfigHome(), "playbooks")
 
 	os.RemoveAll(playbookDirs)
 	os.MkdirAll(playbookDirs, 0o755)
 
 	log.Printf("Cloning playbooks into \"%s\"...\n", playbookDirs)
-	_, err := git.PlainClone(playbookDirs, false, &git.CloneOptions{
+	_, err = git.PlainClone(playbookDirs, false, &git.CloneOptions{
 		URL:      playbookGit,
 		Progress: os.Stdout,
 	})
@@ -46,10 +54,10 @@ func Setup(host string, port int16) int {
 
 	defer f.Close()
 
-	f.WriteString(fmt.Sprintf("[%s]\n", host))
-	f.WriteString(fmt.Sprintf("%s:%d\n", host, port))
+	f.WriteString(fmt.Sprintf("[%s]\n", target.Name))
+	f.WriteString(fmt.Sprintf("%s:%d\n", target.Address, target.Port))
 
-	log.Printf("Executing playbook on target host \"%s\"...\n", host)
+	log.Printf("Executing playbook on target host \"%s\"...\n", target.Name)
 
 	return 0
 
