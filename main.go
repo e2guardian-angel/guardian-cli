@@ -36,6 +36,9 @@ var CLI struct {
 		} `cmd help:"List configured target hosts"`
 		Reset struct {
 		} `cmd help:"Reset SSH and clear all hosts"`
+		Test struct {
+			Name string `arg name:"name" help:"Name of target host to update"`
+		} `cmd help:"Run test ssh command"`
 	} `cmd help:"Operations on target hosts"`
 }
 
@@ -61,6 +64,8 @@ func main() {
 	case "target reset":
 		code = utils.ResetSsh()
 		break
+	case "target test <name>":
+		code = utils.TestSshCommand(CLI.Target.Test.Name)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1

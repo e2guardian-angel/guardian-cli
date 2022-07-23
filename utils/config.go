@@ -69,7 +69,7 @@ func writeConfig(config Configuration) error {
 		log.Fatal("Failed to create config file: ", err)
 		return err
 	}
-
+	defer f.Close()
 	f.WriteString(string(jsonString))
 	return nil
 }

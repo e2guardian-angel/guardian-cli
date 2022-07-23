@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path"
 
 	"github.com/go-git/go-git/v5"
@@ -50,38 +49,54 @@ func Setup(name string) int {
 	}
 
 	// Create hosts file
-	hostFileName := path.Join(playbookDir, "hosts.yml")
-	hostsFile, err := os.Create(hostFileName)
+	inventoryFile, err := os.Create(path.Join(playbookDir, "hosts.yml"))
 	if err != nil {
-		log.Fatal("Failed creating inventory file: ", err)
+		log.Fatal("Failed to create config file: ", err)
 		return -1
 	}
-	defer hostsFile.Close()
+	defer inventoryFile.Close()
+	inventoryFile.WriteString("[local]\n")
+	inventoryFile.WriteString("127.0.0.1\n")
 
-	// Write a host entry for this host
-	hostsFile.WriteString(fmt.Sprintf("[%s]\n", target.Name))
-	hostsFile.WriteString(fmt.Sprintf("%s:%d\n", target.Address, target.Port))
-	hostsFile.WriteString("")
-
-	/*fmt.Println("A password will be needed for sudo access.")
-	password, err := getUserCredentials()
+	// Create vars file
+	varsFile, err := os.Create(path.Join(playbookDir, "extra.yml"))
 	if err != nil {
-		log.Fatal("Error fetching password: ", err)
+		log.Fatal("Failed to create config file: ", err)
 		return -1
-	}*/
+	}
+	defer varsFile.Close()
+	varsFile.WriteString(fmt.Sprintf("home_dir: \"%s\"\n", target.HomePath))
+
+	log.Printf("Copying playbook to remote host...")
+	dstPath := path.Join(target.HomePath, ".guardian", "playbooks")
+
+	sftpc, err := NewSshClient(target.Username, target.Address, int(target.Port), getPrivateKeyFilename(), "")
+	if err != nil {
+		log.Fatal("Failed to create SSH client: ", err)
+		return -1
+	}
+
+	err = sftpc.Put(playbookDir, dstPath)
+	if err != nil {
+		log.Fatal("Failed to copy playbooks to target host: ", err)
+		return -1
+	}
 
 	log.Printf("Executing playbook on target host \"%s\"...\n", target.Name)
-
-	sshOptionsLine := fmt.Sprintf("-o UserKnownHostsFile=%s -i %s\n", getKnownHostsFile(), getPrivateKeyFilename())
-	cmd := exec.Command("ansible-playbook", "-i", hostFileName, "-e", fmt.Sprintf("\"home_dir=%s\"", target.HomePath),
-		"--ssh-extra-args", sshOptionsLine, "-u", target.Username, "-K", "site.yml")
-	cmd.Dir = playbookDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Run()
+	log.Printf("You will need to enter your password for sudo access.")
+	password, err := getUserCredentials()
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Fatal("Failed to get password: ", err)
+	}
+
+	sshc, err := NewSshClient(target.Username, target.Address, int(target.Port), getPrivateKeyFilename(), "")
+	if err != nil {
+		log.Fatal("Failed to create SSH client: ", err)
+		return -1
+	}
+	err = sshc.RunCommand(fmt.Sprintf("cd %s && sudo sh setup.sh", dstPath), password)
+	if err != nil {
+		log.Fatal("Failed to run playbook: ", err)
 		return -1
 	}
 
