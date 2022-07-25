@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/justinschw/gofigure/crypto"
 )
 
 const playbookGit = "https://github.com/e2guardian-angel/guardian-playbook.git"
@@ -70,13 +71,18 @@ func Setup(name string) int {
 	log.Printf("Copying playbook to remote host...")
 	dstPath := path.Join(target.HomePath, ".guardian", "playbooks")
 
-	sftpc, err := NewSshClient(target.Username, target.Address, int(target.Port), getPrivateKeyFilename(), "")
+	client := crypto.SshClient{
+		Address:  target.Address,
+		Port:     target.Port,
+		Username: target.Username,
+	}
+	client.SetPrivateKeyAuth(getPrivateKeyFilename(), "")
+	err, ctx := crypto.NewCryptoContext(client)
 	if err != nil {
-		log.Fatal("Failed to create SSH client: ", err)
-		return -1
+		log.Fatal("Failed to generate SSH config: ", err)
 	}
 
-	err = sftpc.Put(playbookDir, dstPath)
+	err = ctx.Put(playbookDir, dstPath)
 	if err != nil {
 		log.Fatal("Failed to copy playbooks to target host: ", err)
 		return -1
@@ -89,12 +95,12 @@ func Setup(name string) int {
 		log.Fatal("Failed to get password: ", err)
 	}
 
-	sshc, err := NewSshClient(target.Username, target.Address, int(target.Port), getPrivateKeyFilename(), "")
-	if err != nil {
-		log.Fatal("Failed to create SSH client: ", err)
-		return -1
-	}
-	err = sshc.RunCommand(fmt.Sprintf("cd %s && sudo sh setup.sh", dstPath), password)
+	err, _ = ctx.RunCommandsWithPrompts([]string{
+		fmt.Sprintf("cd %s", dstPath),
+		"sudo sh setup.sh",
+	}, map[string]string{
+		"[sudo] password for ": password,
+	}, true)
 	if err != nil {
 		log.Fatal("Failed to run playbook: ", err)
 		return -1

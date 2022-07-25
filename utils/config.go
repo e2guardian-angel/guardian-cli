@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"text/tabwriter"
+
+	"github.com/justinschw/gofigure/crypto"
 )
 
 /*
@@ -152,7 +154,37 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 		hostHomePath = fmt.Sprintf("/home/%s", username)
 	}
 	newHost := Host{name, host, username, port, hostHomePath}
-	err = copySshKeys(newHost, noPassword)
+
+	fmt.Println("Need remote password to copy keys to remote host.")
+	password, err := getUserCredentials()
+	if err != nil {
+		log.Fatal("Failed to retrieve user password: ", err)
+		return -1
+	}
+
+	// Copy SSH keys to remote host
+	sshClient := crypto.SshClient{
+		Address:         newHost.Address,
+		Port:            newHost.Port,
+		Username:        newHost.Username,
+		HostKeyCallback: PromptAtKey,
+		KnownHostsFile:  getKnownHostsFile(),
+	}
+
+	sshClient.SetPasswordAuth(password)
+
+	err, ctx := crypto.NewCryptoContext(sshClient)
+	if err != nil {
+		log.Fatal("Failed to establish SSH connection: ", err)
+		return -1
+	}
+
+	pair := crypto.SshKeyPair{
+		PrivateKeyFile: getPrivateKeyFilename(),
+		PublicKeyFile:  getPublicKeyFilename(),
+		BitSize:        4096,
+	}
+	err = ctx.CopyKeyToRemote(pair)
 	if err != nil {
 		return -1
 	}
@@ -224,7 +256,36 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 		return -1
 	}
 
-	err = copySshKeys(host, noPassword)
+	fmt.Println("Need remote password to copy keys to remote host.")
+	password, err := getUserCredentials()
+	if err != nil {
+		log.Fatal("Failed to retrieve user password: ", err)
+		return -1
+	}
+
+	// Copy SSH keys to remote host
+	sshClient := crypto.SshClient{
+		Address:         host.Address,
+		Port:            host.Port,
+		Username:        host.Username,
+		HostKeyCallback: PromptAtKey,
+		KnownHostsFile:  getKnownHostsFile(),
+	}
+
+	sshClient.SetPasswordAuth(password)
+
+	err, ctx := crypto.NewCryptoContext(sshClient)
+	if err != nil {
+		log.Fatal("Failed to establish SSH connection: ", err)
+		return -1
+	}
+
+	pair := crypto.SshKeyPair{
+		PrivateKeyFile: getPrivateKeyFilename(),
+		PublicKeyFile:  getPublicKeyFilename(),
+		BitSize:        4096,
+	}
+	err = ctx.CopyKeyToRemote(pair)
 	if err != nil {
 		return -1
 	}
@@ -234,7 +295,7 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 		return -1
 	}
 
-	fmt.Printf("Successfully update host '%s' in targets.\n", name)
+	fmt.Printf("Successfully updated host '%s' in targets.\n", name)
 	return 0
 
 }
