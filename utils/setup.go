@@ -99,7 +99,7 @@ func Setup(name string) int {
 		}
 	}
 
-	err, _ = client.RunCommandsWithPrompts([]string{
+	_, err = client.RunCommandsWithPrompts([]string{
 		fmt.Sprintf("cd %s", dstPath),
 		"sudo sh setup.sh",
 	}, map[string]string{

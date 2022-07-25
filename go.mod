@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/alecthomas/kong v0.6.1
 	github.com/go-git/go-git/v5 v5.4.2
-	github.com/justinschw/gofigure v1.0.1
+	github.com/justinschw/gofigure v1.0.2
 	github.com/manifoldco/promptui v0.9.0
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467

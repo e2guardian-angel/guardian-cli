@@ -251,7 +251,7 @@ func TestSshCommand(name string) int {
 		log.Fatal("Failed to create SSH context: ", err)
 	}
 
-	err, _ = client.RunCommands([]string{
+	_, err = client.RunCommands([]string{
 		"ls -lh /",
 	}, true)
 	if err != nil {

@@ -50,7 +50,12 @@ func main() {
 		code = utils.AddHost(CLI.Target.Add.Name, CLI.Target.Add.Host, CLI.Target.Add.Port, CLI.Target.Add.Username, CLI.Target.Add.NoPassword, CLI.Target.Add.HomePath)
 		break
 	case "target update <name> <host>":
-		host := utils.Host{CLI.Target.Update.Name, CLI.Target.Update.Host, CLI.Target.Update.Username, CLI.Target.Update.Port, CLI.Target.Update.HomePath}
+		host := utils.Host{
+			Name:     CLI.Target.Update.Name,
+			Address:  CLI.Target.Update.Host,
+			Username: CLI.Target.Update.Username,
+			Port:     CLI.Target.Update.Port,
+			HomePath: CLI.Target.Update.HomePath}
 		code = utils.UpdateHost(CLI.Target.Update.Name, host, CLI.Target.Update.NoPassword)
 	case "target setup <name>":
 		code = utils.Setup(CLI.Target.Setup.Name)
