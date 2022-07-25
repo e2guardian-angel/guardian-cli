@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/alecthomas/kong v0.6.1
 	github.com/go-git/go-git/v5 v5.4.2
+	github.com/justinschw/gofigure v1.0.1
 	github.com/manifoldco/promptui v0.9.0
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
@@ -21,7 +22,6 @@ require (
 	github.com/go-git/go-billy/v5 v5.3.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/justinschw/gofigure v1.0.0 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20201106050909-4977a11b4351 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

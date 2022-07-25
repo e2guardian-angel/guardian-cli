@@ -166,15 +166,21 @@ func PromptAtKey(hostname string, remote net.Addr, key ssh.PublicKey) error {
 	fingerprint := FingerprintMD5(key)
 
 	fmt.Printf("Remote target '%s' sent public key with fingerprint: %s\n", hostname, fingerprint)
-	prompt := promptui.Select{
-		Label: "Do you wish to accept this key and continue? (yes/no)",
-		Items: []string{"yes", "no"},
-	}
-	_, result, err := prompt.Run()
-	if err != nil {
-		return err
-	} else if result == "no" {
-		return errors.New("User rejected public key.")
+
+	// For automation, allow auto acceptance of new public key
+	autoAccept := os.Getenv("AUTOACCEPT_PUBKEY")
+	if autoAccept == "" {
+		// prompt for user input
+		prompt := promptui.Select{
+			Label: "Do you wish to accept this key and continue? (yes/no)",
+			Items: []string{"yes", "no"},
+		}
+		_, result, err := prompt.Run()
+		if err != nil {
+			return err
+		} else if result == "no" {
+			return errors.New("User rejected public key.")
+		}
 	}
 
 	err, exists := knownHostContains(line)
@@ -251,12 +257,12 @@ func TestSshCommand(name string) int {
 	}
 
 	client.SetPrivateKeyAuth(getPrivateKeyFilename(), "")
-	err, ctx := crypto.NewCryptoContext(client)
+	err = client.NewCryptoContext()
 	if err != nil {
 		log.Fatal("Failed to create SSH context: ", err)
 	}
 
-	err, _ = ctx.RunCommands([]string{
+	err, _ = client.RunCommands([]string{
 		"ls -lh /",
 	}, true)
 	if err != nil {

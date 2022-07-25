@@ -161,11 +161,14 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 		return -1
 	}
 
-	fmt.Println("Need remote password to copy keys to remote host.")
-	password, err := getUserCredentials()
-	if err != nil {
-		log.Fatal("Failed to retrieve user password: ", err)
-		return -1
+	password := os.Getenv(fmt.Sprintf("NEWHOST_PASSWORD_%s", newHost.Name))
+	if password == "" {
+		fmt.Println("Need remote password to copy keys to remote host.")
+		password, err = getUserCredentials()
+		if err != nil {
+			log.Fatal("Failed to retrieve user password: ", err)
+			return -1
+		}
 	}
 
 	// Copy SSH keys to remote host
@@ -179,7 +182,7 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 
 	sshClient.SetPasswordAuth(password)
 
-	err, ctx := crypto.NewCryptoContext(sshClient)
+	err = sshClient.NewCryptoContext()
 	if err != nil {
 		log.Fatal("Failed to establish SSH connection: ", err)
 		return -1
@@ -190,7 +193,7 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 		PublicKeyFile:  getPublicKeyFilename(),
 		BitSize:        4096,
 	}
-	err = ctx.CopyKeyToRemote(pair)
+	err = sshClient.CopyKeyToRemote(pair)
 	if err != nil {
 		return -1
 	}
@@ -262,11 +265,14 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 		return -1
 	}
 
-	fmt.Println("Need remote password to copy keys to remote host.")
-	password, err := getUserCredentials()
-	if err != nil {
-		log.Fatal("Failed to retrieve user password: ", err)
-		return -1
+	password := os.Getenv(fmt.Sprintf("NEWHOST_PASSWORD_%s", host.Name))
+	if password == "" {
+		fmt.Println("Need remote password to copy keys to remote host.")
+		password, err = getUserCredentials()
+		if err != nil {
+			log.Fatal("Failed to retrieve user password: ", err)
+			return -1
+		}
 	}
 
 	// Copy SSH keys to remote host
@@ -280,7 +286,7 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 
 	sshClient.SetPasswordAuth(password)
 
-	err, ctx := crypto.NewCryptoContext(sshClient)
+	err = sshClient.NewCryptoContext()
 	if err != nil {
 		log.Fatal("Failed to establish SSH connection: ", err)
 		return -1
@@ -291,7 +297,7 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 		PublicKeyFile:  getPublicKeyFilename(),
 		BitSize:        4096,
 	}
-	err = ctx.CopyKeyToRemote(pair)
+	err = sshClient.CopyKeyToRemote(pair)
 	if err != nil {
 		return -1
 	}

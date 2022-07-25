@@ -77,25 +77,29 @@ func Setup(name string) int {
 		Username: target.Username,
 	}
 	client.SetPrivateKeyAuth(getPrivateKeyFilename(), "")
-	err, ctx := crypto.NewCryptoContext(client)
+	err = client.NewCryptoContext()
 	if err != nil {
 		log.Fatal("Failed to generate SSH config: ", err)
 	}
 
-	err = ctx.Put(playbookDir, dstPath)
+	err = client.Put(playbookDir, dstPath)
 	if err != nil {
 		log.Fatal("Failed to copy playbooks to target host: ", err)
 		return -1
 	}
 
 	log.Printf("Executing playbook on target host \"%s\"...\n", target.Name)
-	log.Printf("You will need to enter your password for sudo access.")
-	password, err := getUserCredentials()
-	if err != nil {
-		log.Fatal("Failed to get password: ", err)
+
+	password := os.Getenv(fmt.Sprintf("SUDO_PASSWORD_%s", target.Name))
+	if password == "" {
+		log.Printf("You will need to enter your password for sudo access.")
+		password, err = getUserCredentials()
+		if err != nil {
+			log.Fatal("Failed to get password: ", err)
+		}
 	}
 
-	err, _ = ctx.RunCommandsWithPrompts([]string{
+	err, _ = client.RunCommandsWithPrompts([]string{
 		fmt.Sprintf("cd %s", dstPath),
 		"sudo sh setup.sh",
 	}, map[string]string{
