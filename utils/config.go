@@ -155,6 +155,12 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 	}
 	newHost := Host{name, host, username, port, hostHomePath}
 
+	err = initSsh(4096)
+	if err != nil {
+		log.Fatal("Failed to retrieve user password: ", err)
+		return -1
+	}
+
 	fmt.Println("Need remote password to copy keys to remote host.")
 	password, err := getUserCredentials()
 	if err != nil {
