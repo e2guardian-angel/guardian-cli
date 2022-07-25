@@ -19,7 +19,7 @@ func Setup(name string) int {
 		return -1
 	}
 
-	err, config := loadConfig()
+	config, err := loadConfig()
 	if err != nil {
 		return -1
 	}

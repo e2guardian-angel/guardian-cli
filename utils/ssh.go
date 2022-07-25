@@ -53,18 +53,6 @@ func getKnownHostsFile() string {
 }
 
 /*
- * Get public key
- */
-func getPublicKeyData() (error, string) {
-	keyFile := getPublicKeyFilename()
-	data, err := ioutil.ReadFile(keyFile)
-	if err != nil {
-		return err, ""
-	}
-	return nil, strings.TrimSpace(string(data))
-}
-
-/*
  * Initialize the ssh key directory, and keys if necessary
  */
 func initSsh(bitSize int) error {
@@ -87,7 +75,8 @@ func initSsh(bitSize int) error {
 	}
 	err = keyPair.CreateKeyPair("")
 	if err != nil {
-		log.Fatal("Failed to get SSH keys: %s", err)
+		log.Fatal("Failed to get SSH keys: ", err)
+		return err
 	}
 
 	_, privateKeyError := os.Stat(keyPair.PrivateKeyFile)
@@ -179,7 +168,7 @@ func PromptAtKey(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		if err != nil {
 			return err
 		} else if result == "no" {
-			return errors.New("User rejected public key.")
+			return errors.New("user rejected public key")
 		}
 	}
 
@@ -220,7 +209,7 @@ func ResetSsh() int {
 			return -1
 		}
 
-		err, config := loadConfig()
+		config, err := loadConfig()
 		if err != nil {
 			return -1
 		}
@@ -238,14 +227,14 @@ func ResetSsh() int {
 
 func TestSshCommand(name string) int {
 
-	err, config := loadConfig()
+	config, err := loadConfig()
 	if err != nil {
 		return -1
 	}
 
 	_, host := FindHost(config, name)
 	if host.Name != name {
-		log.Fatal(fmt.Sprintf("Host '%d' not configured", name))
+		log.Fatalf("host '%s' not configured", name)
 		return -1
 	}
 

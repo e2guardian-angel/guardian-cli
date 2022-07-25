@@ -35,20 +35,20 @@ type Configuration struct {
 /*
  * load the config file
  */
-func loadConfig() (error, Configuration) {
+func loadConfig() (Configuration, error) {
 	guardianHome := GuardianConfigHome()
 	configFile := path.Join(guardianHome, "config.json")
 	data, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		return err, Configuration{}
+		return Configuration{}, err
 	}
 	var config Configuration
 	err = json.Unmarshal([]byte(data), &config)
 	if err != nil {
 		log.Fatal("Failed to parse config file: ", err)
-		return err, Configuration{}
+		return Configuration{}, err
 	}
-	return nil, config
+	return config, err
 }
 
 /*
@@ -135,7 +135,7 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 		return -1
 	}
 
-	err, config := loadConfig()
+	config, err := loadConfig()
 	if err != nil {
 		return -1
 	}
@@ -219,7 +219,7 @@ func DeleteHost(name string) int {
 		return -1
 	}
 
-	err, config := loadConfig()
+	config, err := loadConfig()
 	if err != nil {
 		return -1
 	}
@@ -249,7 +249,7 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 		return -1
 	}
 
-	err, config := loadConfig()
+	config, err := loadConfig()
 	if err != nil {
 		return -1
 	}
@@ -322,7 +322,7 @@ func ListHosts() int {
 		return -1
 	}
 
-	err, config := loadConfig()
+	config, err := loadConfig()
 	if err != nil {
 		return -1
 	}
