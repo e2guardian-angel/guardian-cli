@@ -24,7 +24,7 @@ var CLI struct {
 			Username   string `arg:"" name:"username" help:"Username for SSH login" required:"true"`
 			Port       uint16 `name:"port" help:"SSH port" default:"22"`
 			NoPassword bool   `name:"no-password" help:"Don't use password auth for SSH key exchange" default:"false"`
-			HomePath   string `help:"Custom home path on remote target installation"`
+			HomePath   string `name:"home-path" help:"Custom home path on remote target installation"`
 		} `cmd:"" name:"update" help:"Updates a target host for installation"`
 		Delete struct {
 			Name string `arg:"" name:"name" help:"Name of target host to delete"`
@@ -40,7 +40,7 @@ var CLI struct {
 			Name string `arg:"" name:"name" help:"Name of target host to test"`
 		} `cmd:"" name:"test" help:"Run test ssh command"`
 	} `cmd:"" name:"target" help:"Operations on target hosts"`
-	/*Filter struct {
+	Filter struct {
 		Target string `name:"target" help:"Name of target host for changes" required:"true"`
 		Deploy struct {
 			RestoreBackup string `name:"restore-backup" help:"Restore configuration from a backup file" type:"filename"`
@@ -49,13 +49,15 @@ var CLI struct {
 			ToFile string `name:"to-file" help:"Restore configuration from a backup file" type:"filename" required:"true"`
 		} `cmd:"" name:"deploy" help:"Backup target host's filter configuration"`
 		Uninstall struct {
-		} `cmd:"" name:"deploy" help:"Uininstall filter stack on target host"`
-		SafeSearchEnabled bool `arg:"" name:"safesearch-enabled" help:"Enable or disable safesearch" default:"false"`
-		PhraseList        struct {
+		} `cmd:"" name:"deploy" help:"Uninstall filter stack on target host"`
+		SafeSearch struct {
+			Force bool `arg:"" name:"force" help:"Safesearch is enforced" default:"false"`
+		} `cmd:"" name:"safe-search" help:"Safe search option"`
+		PhraseList struct {
 			AddPhrase struct {
-				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
-				Phrase string `arg:"" name:"phrase" help:"Phrase to add to the list" type:"comma separated list"`
-				Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase" type:"integer"`
+				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify" required:"true"`
+				Phrase string `arg:"" name:"phrase" help:"Phrase to add to the list" type:"comma separated list" required:"true"`
+				Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
 			} `cmd:"" name:"add-phrase" help:"Add a phrase to an existing list"`
 			RemovePhrase struct {
 				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
@@ -68,9 +70,9 @@ var CLI struct {
 			} `cmd:"" name:"add-list" help:"Create a new phrase list"`
 			RemoveList struct {
 				Name string `arg:"" name:"name" help:"Name of the phrase list to delete"`
-			} `cmd:"" name:"add-list" help:"Delete an existing phrase list"`
+			} `cmd:"" name:"remove-list" help:"Delete an existing phrase list"`
 		} `cmd:"" name:"phrase-list" help:"Backup target host's filter configuration"`
-	} `cmd:"" help:"Deployment and configuration of the web filter"`*/
+	} `cmd:"" help:"Deployment and configuration of the web filter"`
 }
 
 func main() {
