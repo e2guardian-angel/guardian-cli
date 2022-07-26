@@ -1,11 +1,15 @@
 package utils
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"path"
+	"reflect"
 
 	"github.com/go-git/go-git/v5"
 	"gopkg.in/yaml.v2"
@@ -86,16 +90,15 @@ type FilterConfig struct {
 	gatewayIP        string
 	localTransparent bool
 	// Lookup service
-	lookupHostName     string
-	internalHttpPort   int
-	internalHttpsPort  int
-	safeSearchEnforced bool
-	guardianConfigDir  string
-	aclDatabaseFile    string
-	guardianReplicas   int
-	aclVolumeSize      string
+	lookupHostName    string // defunct
+	internalHttpPort  int
+	internalHttpsPort int
+	guardianConfigDir string
+	aclDatabaseFile   string // defunct
+	guardianReplicas  int
+	aclVolumeSize     string
 	// Filter
-	proxyHostName       string
+	proxyHostName       string // defunct
 	squidInternalPort   int
 	squidPublicPort     int
 	icapInternalPort    int
@@ -113,6 +116,7 @@ type FilterConfig struct {
 	filterReplicas      int
 	phraseVolumeSize    string
 	// DNS
+	safeSearchEnforced bool
 	publicDnsPort      int
 	reverseDnsPort     int
 	reverseDnsReplicas int
@@ -124,6 +128,7 @@ type FilterConfig struct {
 	dbInternalPort     int
 	dbServicePort      int
 	guardianDbReplicas int
+	dbPassword         string
 	dbVolumeSize       string
 	// CA cert info
 	caCountry    string
@@ -138,6 +143,33 @@ type FilterConfig struct {
 	redisHost     string
 	redisPort     int
 	redisReplicas int
+	redisPassword string
+}
+
+var componentMap = map[string][]string{
+	"guardian-angel": []string{
+		"safeSearchEnforced",
+	},
+	"webfilter": []string{
+		"transparent",
+		"allowRules",
+		"decryptRules",
+		"e2guardianConfig",
+		"cacheTTL",
+		"maxKeys",
+	},
+	"guardian-db": []string{
+		"dbPassword",
+	},
+	"dns": []string{
+		"safeSearchEnforced",
+	},
+	"redis": []string{
+		"redisHost",
+		"redisPort",
+		"redisReplicas",
+		"redisPassword",
+	},
 }
 
 func getHelmPath() string {
@@ -150,6 +182,7 @@ func getRemoteHelmPath(host Host) string {
 }
 
 func checkoutHelm() error {
+
 	helmPath := getHelmPath()
 	/*
 	 * TODO: instead of wiping the directory and re-cloning, just do a git pull
@@ -202,6 +235,48 @@ func loadHostFilterConfig(host string) (FilterConfig, error) {
 }
 
 /*
+ * Find the diff between this config and the default
+ */
+func getFilterConfDiff(conf FilterConfig) ([]string, error) {
+
+	var (
+		diff        []string
+		defaultConf FilterConfig
+		confVal     reflect.Value
+		defaultVal  reflect.Value
+		err         error
+	)
+
+	if defaultConf, err = loadDefaultFilterConfig(); err != nil {
+		return diff, err
+	}
+
+	// Ignore secrets and host-specific generated options
+	defaultConf.masterNode = conf.masterNode
+	defaultConf.dbPassword = conf.dbPassword
+	defaultConf.redisPassword = conf.redisPassword
+
+	confVal = reflect.ValueOf(conf)
+	defaultVal = reflect.ValueOf(defaultConf)
+	for i := 0; i < confVal.Type().NumField(); i++ {
+		var (
+			val1 reflect.Value = confVal.Index(i)
+			val2 reflect.Value = defaultVal.Index(i)
+		)
+		if val1 != val2 {
+			diff = append(diff, confVal.Type().Field(i).Name)
+		}
+	}
+
+	return diff, nil
+
+}
+
+/*
+ * Get the list of services to restart
+ */
+
+/*
  * Save the host's filter config
  */
 func writeHostFilterConfig(host string, config FilterConfig) error {
@@ -229,31 +304,75 @@ func getHostFilterConfigPath(host string) string {
 	return path.Join(hostDataDir, "overrides.yaml")
 }
 
+func randomString(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(s)
+}
+
+type workerJson struct {
+	items []struct {
+		metadata struct {
+			name string
+		}
+	}
+}
+
 /*
  * Init host config
  */
-func initHostConfig(host string) (FilterConfig, error) {
+func initHostConfig(host Host) (FilterConfig, error) {
 
 	err := checkoutHelm()
 	if err != nil {
 		return FilterConfig{}, err
 	}
 
-	hostFilterConfPath := getHostFilterConfigPath(host)
+	hostFilterConfPath := getHostFilterConfigPath(host.Name)
 
 	_, err = os.Stat(hostFilterConfPath)
 	if os.IsNotExist(err) {
+
 		// Use default config
 		config, err := loadDefaultFilterConfig()
 		if err != nil {
 			return config, err
 		}
 
+		client, err := getHostSshClient(host)
+		if err != nil {
+			return FilterConfig{}, err
+		}
+
+		out, err := client.RunCommands([]string{
+			"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
+			"kubectl get nodes -o json",
+		}, false)
+		if err != nil {
+			return FilterConfig{}, err
+		}
+		var result workerJson
+		err = json.Unmarshal([]byte(out), &result)
+		if err != nil {
+			return FilterConfig{}, err
+		} else if len(result.items) == 0 {
+			return FilterConfig{}, errors.New("No nodes configured on remote host")
+		}
+
+		config.masterNode = result.items[0].metadata.name
+		config.redisPassword = randomString(32)
+		config.dbPassword = randomString(32)
+
 		// Write config to file
-		err = writeHostFilterConfig(host, config)
+		err = writeHostFilterConfig(host.Name, config)
 		return config, err
+
 	} else {
-		return loadFilterConfig(host)
+		return loadFilterConfig(host.Name)
 	}
 
 }
@@ -288,7 +407,7 @@ func copyHelmToRemote(host Host) error {
 
 func Deploy(host Host) int {
 
-	_, err := initHostConfig(host.Name)
+	_, err := initHostConfig(host)
 	if err != nil {
 		log.Fatal("Failed to initialize host filter config: ", err)
 		return -1
@@ -312,6 +431,7 @@ func Deploy(host Host) int {
 
 	_, err = client.RunCommands([]string{
 		fmt.Sprintf("cd %s", getRemoteHelmPath(host)),
+		"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
 		fmt.Sprintf("helm upgrade --install --create-namespace -f overrides.yaml -n filter guardian-angel guardian-angel"),
 	}, true)
 	if err != nil {
