@@ -72,8 +72,9 @@ func writeConfig(config Configuration) error {
 		return err
 	}
 	defer f.Close()
-	f.WriteString(string(jsonString))
-	return nil
+	_, err = f.WriteString(string(jsonString))
+
+	return err
 }
 
 /*
@@ -263,6 +264,10 @@ func UpdateHost(name string, host Host, noPassword bool) int {
 	config, err := loadConfig()
 	if err != nil {
 		return -1
+	}
+
+	if host.HomePath == "" {
+		host.HomePath = fmt.Sprintf("/home/%s", host.Username)
 	}
 
 	index, _ := FindHost(config, name)

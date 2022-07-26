@@ -165,9 +165,6 @@ var componentMap = map[string][]string{
 		"safeSearchEnforced",
 	},
 	"redis": []string{
-		"redisHost",
-		"redisPort",
-		"redisReplicas",
 		"redisPassword",
 	},
 }
@@ -175,6 +172,10 @@ var componentMap = map[string][]string{
 func getHelmPath() string {
 	guardianHome := GuardianConfigHome()
 	return path.Join(guardianHome, "helm")
+}
+
+func getHostVolumePath(host Host) string {
+	return path.Join(host.HomePath, ".guardian", "volumes")
 }
 
 func getRemoteHelmPath(host Host) string {
@@ -253,6 +254,7 @@ func getFilterConfDiff(conf FilterConfig) ([]string, error) {
 
 	// Ignore secrets and host-specific generated options
 	defaultConf.masterNode = conf.masterNode
+	defaultConf.volumePath = conf.volumePath
 	defaultConf.dbPassword = conf.dbPassword
 	defaultConf.redisPassword = conf.redisPassword
 
@@ -364,6 +366,7 @@ func initHostConfig(host Host) (FilterConfig, error) {
 		}
 
 		config.masterNode = result.items[0].metadata.name
+		config.volumePath = fmt.Sprintf("%s/db", getHostVolumePath(host))
 		config.redisPassword = randomString(32)
 		config.dbPassword = randomString(32)
 
