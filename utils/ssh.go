@@ -134,6 +134,21 @@ func appendToKnownHosts(line string) error {
 	return nil
 }
 
+func getHostSshClient(host Host) (crypto.SshClient, error) {
+
+	client := crypto.SshClient{
+		Address:        host.Address,
+		Port:           host.Port,
+		Username:       host.Username,
+		KnownHostsFile: getKnownHostsFile(),
+	}
+	client.SetPrivateKeyAuth(getPrivateKeyFilename(), "")
+
+	err := client.NewCryptoContext()
+	return client, err
+
+}
+
 // hexadecimal md5 hash grouped by 2 characters separated by colons
 // Copy/pasted from: https://github.com/golang/go/issues/12292#issuecomment-255588529
 func FingerprintMD5(key ssh.PublicKey) string {
@@ -238,14 +253,7 @@ func TestSshCommand(name string) int {
 		return -1
 	}
 
-	client := crypto.SshClient{
-		Address:        host.Address,
-		Port:           host.Port,
-		Username:       host.Username,
-		KnownHostsFile: getKnownHostsFile(),
-	}
-
-	client.SetPrivateKeyAuth(getPrivateKeyFilename(), "")
+	client, err := getHostSshClient(host)
 	err = client.NewCryptoContext()
 	if err != nil {
 		log.Fatal("Failed to create SSH context: ", err)

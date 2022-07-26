@@ -17,7 +17,7 @@ var CLI struct {
 			Port       uint16 `name:"port" help:"SSH port" default:"22"`
 			NoPassword bool   `name:"no-password" help:"Don't use password auth for SSH key exchange" default:"false"`
 			HomePath   string `name:"home-path" help:"Custom home path on remote target installation"`
-		} `cmd:"" help:"Add a target host for installation" required:"true"`
+		} `cmd:"" name:"add" help:"Add a target host for installation" required:"true"`
 		Update struct {
 			Name       string `arg:"" name:"name" help:"Name of target host to update" required:"true"`
 			Host       string `arg:"" name:"host" help:"Target host address for install" type:"ip/hostname" required:"true"`
@@ -25,21 +25,52 @@ var CLI struct {
 			Port       uint16 `name:"port" help:"SSH port" default:"22"`
 			NoPassword bool   `name:"no-password" help:"Don't use password auth for SSH key exchange" default:"false"`
 			HomePath   string `help:"Custom home path on remote target installation"`
-		} `cmd:"" help:"Updates a target host for installation"`
+		} `cmd:"" name:"update" help:"Updates a target host for installation"`
 		Delete struct {
 			Name string `arg:"" name:"name" help:"Name of target host to delete"`
-		} `cmd:"" help:"Deletes a target host"`
+		} `cmd:"" name:"delete" help:"Deletes a target host"`
 		Setup struct {
 			Name string `arg:"" name:"name" help:"Target to select for setup"`
-		} `cmd:"" help:"Setup dependencies on host"`
+		} `cmd:"" name:"setup" help:"Setup dependencies on host"`
 		List struct {
-		} `cmd:"" help:"List configured target hosts"`
+		} `cmd:"" name:"list" help:"List configured target hosts"`
 		Reset struct {
-		} `cmd:"" help:"Reset SSH and clear all hosts"`
+		} `cmd:"" name:"reset" help:"Reset SSH and clear all hosts"`
 		Test struct {
-			Name string `arg:"" name:"name" help:"Name of target host to update"`
-		} `cmd:"" help:"Run test ssh command"`
-	} `cmd:"" help:"Operations on target hosts"`
+			Name string `arg:"" name:"name" help:"Name of target host to test"`
+		} `cmd:"" name:"test" help:"Run test ssh command"`
+	} `cmd:"" name:"target" help:"Operations on target hosts"`
+	Filter struct {
+		Target string `name:"target" help:"Name of target host for changes" required:"true"`
+		Deploy struct {
+			RestoreBackup string `name:"restore-backup" help:"Restore configuration from a backup file" type:"filename"`
+		} `cmd:"" name:"deploy" help:"Deploy filter stack to target host"`
+		Backup struct {
+			ToFile string `name:"to-file" help:"Restore configuration from a backup file" type:"filename" required:"true"`
+		} `cmd:"" name:"deploy" help:"Backup target host's filter configuration"`
+		Uninstall struct {
+		} `cmd:"" name:"deploy" help:"Uininstall filter stack on target host"`
+		SafeSearchEnabled bool `arg:"" name:"safesearch-enabled" help:"Enable or disable safesearch" default:"false"`
+		PhraseList        struct {
+			AddPhrase struct {
+				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
+				Phrase string `arg:"" name:"phrase" help:"Phrase to add to the list" type:"comma separated list"`
+				Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase" type:"integer"`
+			} `cmd:"" name:"add-phrase" help:"Add a phrase to an existing list"`
+			RemovePhrase struct {
+				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
+				Phrase string `arg:"" name:"phrase" help:"Phrase to remove from an existing list" type:"comma separated list"`
+			} `cmd:"" name:"remove-phrase" help:"Remove a phrase from an existing list"`
+			AddList struct {
+				Name        string `arg:"" name:"name" help:"Name of the phrase list to create"`
+				Weighted    bool   `arg:"" name:"weighted" help:"Indicates that phrase list is weiighted" type:"true/false" default:"false"`
+				Naughtiness int    `arg:"" name:"naughtiness" help:"For weighted lists, the naughtiness limit" type:"integer"`
+			} `cmd:"" name:"add-list" help:"Create a new phrase list"`
+			RemoveList struct {
+				Name string `arg:"" name:"name" help:"Name of the phrase list to delete"`
+			} `cmd:"" name:"add-list" help:"Delete an existing phrase list"`
+		} `cmd:"" name:"phrase-list" help:"Backup target host's filter configuration"`
+	} `cmd:"" help:"Deployment and configuration of the web filter"`
 }
 
 func main() {

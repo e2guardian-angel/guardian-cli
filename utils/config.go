@@ -92,6 +92,11 @@ func FindHost(config Configuration, name string) (int, Host) {
 	return index, result
 }
 
+func getHostDataDir(name string) string {
+	guardianHome := GuardianConfigHome()
+	return path.Join(guardianHome, "host_data", name)
+}
+
 /*
  * Initialize local guardian config
  */
@@ -154,6 +159,12 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 		hostHomePath = fmt.Sprintf("/home/%s", username)
 	}
 	newHost := Host{name, host, username, port, hostHomePath}
+
+	hostDataPath := getHostDataDir(newHost.Name)
+	_, err = os.Stat(hostDataPath)
+	if os.IsNotExist(err) {
+		os.MkdirAll(hostDataPath, 0o755)
+	}
 
 	err = initSsh(4096)
 	if err != nil {
