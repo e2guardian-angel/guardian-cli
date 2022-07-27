@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"reflect"
 
 	"github.com/go-git/go-git/v5"
 	"gopkg.in/yaml.v2"
@@ -81,6 +80,11 @@ type E2guardianConfig struct {
 	extensionslist []ExtensionGroup
 }
 
+type TlsSecret struct {
+	cert string
+	key  string
+}
+
 type FilterConfig struct {
 	// Host specific
 	masterNode string
@@ -144,29 +148,7 @@ type FilterConfig struct {
 	redisPort     int
 	redisReplicas int
 	redisPassword string
-}
-
-var componentMap = map[string][]string{
-	"guardian-angel": []string{
-		"safeSearchEnforced",
-	},
-	"webfilter": []string{
-		"transparent",
-		"allowRules",
-		"decryptRules",
-		"e2guardianConfig",
-		"cacheTTL",
-		"maxKeys",
-	},
-	"guardian-db": []string{
-		"dbPassword",
-	},
-	"dns": []string{
-		"safeSearchEnforced",
-	},
-	"redis": []string{
-		"redisPassword",
-	},
+	tls           TlsSecret
 }
 
 func getHelmPath() string {
@@ -234,49 +216,6 @@ func loadHostFilterConfig(host string) (FilterConfig, error) {
 	filterConfigPath := getHostDataDir(host)
 	return loadFilterConfig(filterConfigPath)
 }
-
-/*
- * Find the diff between this config and the default
- */
-func getFilterConfDiff(conf FilterConfig) ([]string, error) {
-
-	var (
-		diff        []string
-		defaultConf FilterConfig
-		confVal     reflect.Value
-		defaultVal  reflect.Value
-		err         error
-	)
-
-	if defaultConf, err = loadDefaultFilterConfig(); err != nil {
-		return diff, err
-	}
-
-	// Ignore secrets and host-specific generated options
-	defaultConf.masterNode = conf.masterNode
-	defaultConf.volumePath = conf.volumePath
-	defaultConf.dbPassword = conf.dbPassword
-	defaultConf.redisPassword = conf.redisPassword
-
-	confVal = reflect.ValueOf(conf)
-	defaultVal = reflect.ValueOf(defaultConf)
-	for i := 0; i < confVal.Type().NumField(); i++ {
-		var (
-			val1 reflect.Value = confVal.Index(i)
-			val2 reflect.Value = defaultVal.Index(i)
-		)
-		if val1 != val2 {
-			diff = append(diff, confVal.Type().Field(i).Name)
-		}
-	}
-
-	return diff, nil
-
-}
-
-/*
- * Get the list of services to restart
- */
 
 /*
  * Save the host's filter config
@@ -429,8 +368,6 @@ func Deploy(host Host) int {
 		log.Fatal("Failed to create SSH connection: ", err)
 		return -1
 	}
-
-	// TODO: diff changes and generate commands for restarting services
 
 	_, err = client.RunCommands([]string{
 		fmt.Sprintf("cd %s", getRemoteHelmPath(host)),
