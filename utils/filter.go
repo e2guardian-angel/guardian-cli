@@ -199,7 +199,7 @@ func loadDefaultFilterConfig() (FilterConfig, error) {
  * load the filter config file for this host
  */
 func loadHostFilterConfig(host string) (FilterConfig, error) {
-	filterConfigPath := getHostDataDir(host)
+	filterConfigPath := getHostFilterConfigPath(host)
 	return loadFilterConfig(filterConfigPath)
 }
 
@@ -309,7 +309,7 @@ func copyHelmToRemote(host Host) error {
 
 	srcPath := getHelmPath()
 	overrides := getHostFilterConfigPath(host.Name)
-	dstPath := getHostFilterConfigPath(host.Name)
+	dstPath := getRemoteHelmPath(host)
 
 	client, err := getHostSshClient(host)
 	if err != nil {
@@ -380,5 +380,6 @@ func Deploy(name string) int {
 		return -1
 	}
 
+	fmt.Println("Deployment successful.")
 	return 0
 }
