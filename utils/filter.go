@@ -374,6 +374,7 @@ func Deploy(name string) int {
 		fmt.Sprintf("cd %s", getRemoteHelmPath(host)),
 		"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
 		"helm upgrade --install --create-namespace -f overrides.yaml -n filter guardian-angel guardian-angel",
+		"dd if=/dev/null of=overrides.yaml",
 	}, true)
 	if err != nil {
 		log.Fatal("Failed to deploy filter config: ", err)
