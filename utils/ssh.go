@@ -254,9 +254,14 @@ func TestSshCommand(name string) int {
 	}
 
 	client, err := getHostSshClient(host)
+	if err != nil {
+		log.Fatal("Failed to create SSH connection: ", err)
+		return -1
+	}
 	err = client.NewCryptoContext()
 	if err != nil {
-		log.Fatal("Failed to create SSH context: ", err)
+		log.Fatal("Failed to create SSH connection: ", err)
+		return -1
 	}
 
 	_, err = client.RunCommands([]string{

@@ -43,11 +43,13 @@ var CLI struct {
 	Filter struct {
 		Target string `name:"target" help:"Name of target host for changes" required:"true"`
 		Deploy struct {
-			RestoreBackup string `name:"restore-backup" help:"Restore configuration from a backup file" type:"filename"`
 		} `cmd:"" name:"deploy" help:"Deploy filter stack to target host"`
 		Backup struct {
-			ToFile string `name:"to-file" help:"Restore configuration from a backup file" type:"filename" required:"true"`
+			ToFile string `name:"to-file" help:"path to backup file" type:"filename" required:"true"`
 		} `cmd:"" name:"deploy" help:"Backup target host's filter configuration"`
+		Restore struct {
+			FromFile string `name:"from-file" help:"Restore configuration from a backup file" type:"filename" required:"true"`
+		} `cmd:"" name:"deploy" help:"Restore target host's filter configuration from a backup file"`
 		Uninstall struct {
 		} `cmd:"" name:"deploy" help:"Uninstall filter stack on target host"`
 		SafeSearch struct {
@@ -99,6 +101,8 @@ func main() {
 		code = utils.ResetSsh()
 	case "target test <name>":
 		code = utils.TestSshCommand(CLI.Target.Test.Name)
+	case "filter deploy":
+		code = utils.Deploy(CLI.Filter.Target)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1

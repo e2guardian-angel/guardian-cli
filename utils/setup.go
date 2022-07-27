@@ -71,7 +71,15 @@ func Setup(name string) int {
 	dstPath := path.Join(target.HomePath, ".guardian", "playbooks")
 
 	client, err := getHostSshClient(target)
+	if err != nil {
+		log.Fatal("Failed to create SSH client: ", err)
+		return -1
+	}
 	err = client.NewCryptoContext()
+	if err != nil {
+		log.Fatal("Failed to create SSH client: ", err)
+		return -1
+	}
 
 	if err != nil {
 		log.Fatal("Failed to generate SSH config: ", err)

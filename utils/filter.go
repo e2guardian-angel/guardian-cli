@@ -17,138 +17,124 @@ import (
 const helmChartGit = "https://github.com/e2guardian-angel/guardian-helm.git"
 
 type PhraseGroup struct {
-	groupName string
-	phrases   [][]string
-	includes  []string
+	GroupName string
+	Phrases   [][]string
+	Includes  []string
 }
 
 type SiteGroup struct {
-	groupName string
-	sites     []string
+	GroupName string
+	Sites     []string
 }
 
 type RegexGroup struct {
-	groupName string
-	patterns  []string
+	GroupName string
+	Patterns  []string
 }
 
 type TypeGroup struct {
-	groupName string
-	types     []string
+	GroupName string
+	Types     []string
 }
 
 type ExtensionGroup struct {
-	groupName  string
-	extensions []string
+	GroupName  string
+	Extensions []string
 }
 
 type PhraseList struct {
-	listName string
-	groups   []PhraseGroup
+	ListName string
+	Groups   []PhraseGroup
 }
 
 type SiteLists struct {
-	listName string
-	groups   []SiteGroup
+	ListName string
+	Groups   []SiteGroup
 }
 
 type RegexList struct {
-	listName string
-	groups   []RegexGroup
+	ListName string
+	Groups   []RegexGroup
 }
 
 type TypeList struct {
-	listName string
-	groups   []TypeGroup
+	ListName string
+	Groups   []TypeGroup
 }
 
 type ExtensionList struct {
-	listName string
-	groups   []ExtensionGroup
+	ListName string
+	Groups   []ExtensionGroup
 }
 
 type AclRule struct {
-	category string
-	allow    bool
+	Category string
+	Allow    bool
 }
 
 type E2guardianConfig struct {
-	phraseLists    []PhraseList
-	siteLists      []SiteGroup
-	regexpurlists  []RegexGroup
-	mimetypelists  []TypeGroup
-	extensionslist []ExtensionGroup
+	PhraseLists    []PhraseList
+	SiteLists      []SiteGroup
+	Regexpurlists  []RegexGroup
+	Mimetypelists  []TypeGroup
+	Extensionslist []ExtensionGroup
 }
 
 type TlsSecret struct {
-	cert string
-	key  string
+	Cert string `yaml:"cert,omitempty"`
+	Key  string `yaml:"key,omitempty"`
 }
 
 type FilterConfig struct {
 	// Host specific
-	masterNode string
-	volumePath string
+	MasterNode string `yaml:"masterNode"`
+	VolumePath string `yaml:"volumePath"`
 	// Network
-	localNetwork     string
-	gatewayIP        string
-	localTransparent bool
+	LocalNetwork     string `yaml:"localNetwork"`
+	GatewayIP        string `yaml:"gatewayIP"`
+	LocalTransparent bool   `yaml:"localTransparent"`
 	// Lookup service
-	lookupHostName    string // defunct
-	internalHttpPort  int
-	internalHttpsPort int
-	guardianConfigDir string
-	aclDatabaseFile   string // defunct
-	guardianReplicas  int
-	aclVolumeSize     string
+	GuardianReplicas int    `yaml:"guardianReplicas"`
+	AclVolumeSize    string `yaml:"aclVolumeSize"`
 	// Filter
-	proxyHostName       string // defunct
-	squidInternalPort   int
-	squidPublicPort     int
-	icapInternalPort    int
-	squidConfigDir      string
-	httpsEnabled        bool
-	transparent         bool
-	decryptHTTPS        bool
-	allowRules          string
-	decryptRules        string
-	e2guardianConfigDir string
-	phraseDir           string
-	e2guardianConfig    string
-	cacheTTL            int
-	maxKeys             int
-	filterReplicas      int
-	phraseVolumeSize    string
+	SquidPublicPort  int    `yaml:"squidPublicPort"`
+	HttpsEnabled     bool   `yaml:"httpsEnabled"`
+	Transparent      bool   `yaml:"transparent"`
+	DecryptHTTPS     bool   `yaml:"decryptHTTPS"`
+	AllowRules       string `yaml:"allowRules"`
+	DecryptRules     string `yaml:"decryptRules"`
+	E2guardianConfig string `yaml:"e2guardianConfig"`
+	CacheTTL         int    `yaml:"cacheTTL"`
+	MaxKeys          int    `yaml:"maxKeys"`
+	FilterReplicas   int    `yaml:"filterReplicas"`
+	PhraseVolumeSize string `yaml:"phraseVolumeSize"`
 	// DNS
-	safeSearchEnforced bool
-	publicDnsPort      int
-	reverseDnsPort     int
-	reverseDnsReplicas int
+	SafeSearchEnforced bool `yaml:"safeSearchEnforced"`
+	PublicDnsPort      int  `yaml:"publicDnsPort"`
+	ReverseDnsPort     int  `yaml:"reverseDnsPort"`
+	ReverseDnsReplicas int  `yaml:"reverseDnsReplicas"`
 	// Postgres
-	authDbHost         string
-	persistentDbPath   string
-	postgresUser       string
-	postgresDbName     string
-	dbInternalPort     int
-	dbServicePort      int
-	guardianDbReplicas int
-	dbPassword         string
-	dbVolumeSize       string
+	PostgresUser       string `yaml:"postgresUser"`
+	PostgresDbName     string `yaml:"postgresDbName"`
+	DbServicePort      int    `yaml:"dbServicePort"`
+	GuardianDbReplicas int    `yaml:"guardianDbReplicas"`
+	DbPassword         string `yaml:"dbPassword"`
+	DbVolumeSize       string `yaml:"dbVolumeSize"`
 	// CA cert info
-	caCountry    string
-	caState      string
-	caCity       string
-	caOrg        string
-	caOrgUnit    string
-	caCommonName string
-	caEmail      string
-	caValidDays  int
+	CaCountry    string `yaml:"caCountry"`
+	CaState      string `yaml:"caState"`
+	CaCity       string `yaml:"caCity"`
+	CaOrg        string `yaml:"caOrg"`
+	CaOrgUnit    string `yaml:"caOrgUnit"`
+	CaCommonName string `yaml:"caCommonName"`
+	CaEmail      string `yaml:"caEmail"`
+	CaValidDays  int    `yaml:"caValidDays"`
 	// Redis config
-	redisHost     string
-	redisPort     int
-	redisReplicas int
-	redisPassword string
-	tls           TlsSecret
+	RedisHost     string    `yaml:"redisHost"`
+	RedisPort     int       `yaml:"redisPort"`
+	RedisReplicas int       `yaml:"redisReplicas"`
+	RedisPassword string    `yaml:"redisPassword"`
+	Tls           TlsSecret `yaml:"tls,omitempty"`
 }
 
 func getHelmPath() string {
@@ -221,7 +207,7 @@ func loadHostFilterConfig(host string) (FilterConfig, error) {
  * Save the host's filter config
  */
 func writeHostFilterConfig(host string, config FilterConfig) error {
-	filterConfigPath := getHostDataDir(host)
+	filterConfigPath := getHostFilterConfigPath(host)
 
 	yamlString, err := yaml.Marshal(config)
 	if err != nil {
@@ -256,9 +242,9 @@ func randomString(n int) string {
 }
 
 type workerJson struct {
-	items []struct {
-		metadata struct {
-			name string
+	Items []struct {
+		Metadata struct {
+			Name string
 		}
 	}
 }
@@ -300,21 +286,21 @@ func initHostConfig(host Host) (FilterConfig, error) {
 		err = json.Unmarshal([]byte(out), &result)
 		if err != nil {
 			return FilterConfig{}, err
-		} else if len(result.items) == 0 {
-			return FilterConfig{}, errors.New("No nodes configured on remote host")
+		} else if len(result.Items) == 0 {
+			return FilterConfig{}, errors.New("no nodes configured on remote host")
 		}
 
-		config.masterNode = result.items[0].metadata.name
-		config.volumePath = fmt.Sprintf("%s/db", getHostVolumePath(host))
-		config.redisPassword = randomString(32)
-		config.dbPassword = randomString(32)
+		config.MasterNode = result.Items[0].Metadata.Name
+		config.VolumePath = fmt.Sprintf("%s/db", getHostVolumePath(host))
+		config.RedisPassword = randomString(32)
+		config.DbPassword = randomString(32)
 
 		// Write config to file
 		err = writeHostFilterConfig(host.Name, config)
 		return config, err
 
 	} else {
-		return loadFilterConfig(host.Name)
+		return loadHostFilterConfig(host.Name)
 	}
 
 }
@@ -326,11 +312,14 @@ func copyHelmToRemote(host Host) error {
 	dstPath := getHostFilterConfigPath(host.Name)
 
 	client, err := getHostSshClient(host)
+	if err != nil {
+		return err
+	}
 
 	// delete existing remote helm to prevent conflicts
 	_, err = client.RunCommands([]string{fmt.Sprintf("rm -rf %s", dstPath)}, false)
 	if err != nil {
-		return fmt.Errorf("Failed to wipe helm charts on remote target: %s", err)
+		return fmt.Errorf("failed to wipe helm charts on remote target: %s", err)
 	}
 
 	err = client.Put(srcPath, dstPath)
@@ -347,9 +336,21 @@ func copyHelmToRemote(host Host) error {
  * CLI methods
  */
 
-func Deploy(host Host) int {
+func Deploy(name string) int {
 
-	_, err := initHostConfig(host)
+	config, err := loadConfig()
+	if err != nil {
+		log.Fatal("Failed to load config: ", err)
+		return -1
+	}
+
+	_, host := FindHost(config, name)
+	if host.Name != name {
+		log.Fatalf("Host %s doesn't exist, create it first", name)
+		return -1
+	}
+
+	_, err = initHostConfig(host)
 	if err != nil {
 		log.Fatal("Failed to initialize host filter config: ", err)
 		return -1
@@ -372,7 +373,7 @@ func Deploy(host Host) int {
 	_, err = client.RunCommands([]string{
 		fmt.Sprintf("cd %s", getRemoteHelmPath(host)),
 		"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
-		fmt.Sprintf("helm upgrade --install --create-namespace -f overrides.yaml -n filter guardian-angel guardian-angel"),
+		"helm upgrade --install --create-namespace -f overrides.yaml -n filter guardian-angel guardian-angel",
 	}, true)
 	if err != nil {
 		log.Fatal("Failed to deploy filter config: ", err)
