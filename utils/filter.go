@@ -291,7 +291,7 @@ func initHostConfig(host Host) (FilterConfig, error) {
 		}
 
 		config.MasterNode = result.Items[0].Metadata.Name
-		config.VolumePath = fmt.Sprintf("%s/db", getHostVolumePath(host))
+		config.VolumePath = getHostVolumePath(host)
 		config.RedisPassword = randomString(32)
 		config.DbPassword = randomString(32)
 
