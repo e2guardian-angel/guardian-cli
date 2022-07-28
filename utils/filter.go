@@ -427,12 +427,10 @@ func findPhraseList(e2gConf *E2guardianConfig, listName string) (int, *PhraseLis
 		if listName == value.ListName {
 			phraseList = &value
 			index = i
+			return index, phraseList
 		}
 	}
-	if phraseList.ListName != listName {
-		return -1, nil
-	}
-	return index, phraseList
+	return -1, nil
 }
 
 func findPhraseGroup(list *PhraseList, groupName string) (int, *PhraseGroup) {
@@ -478,6 +476,10 @@ func findPhrase(group *PhraseGroup, phrase string) int {
 func AddPhraseList(listName string, targetName string) int {
 
 	err := updatePhraseList(targetName, func(e2gConf *E2guardianConfig) error {
+		index, _ := findPhraseList(e2gConf, listName)
+		if index != -1 {
+			return fmt.Errorf("list %s already exists", listName)
+		}
 		e2gConf.PhraseLists = append(e2gConf.PhraseLists, PhraseList{
 			ListName: listName,
 			Groups:   []PhraseGroup{},
@@ -489,6 +491,7 @@ func AddPhraseList(listName string, targetName string) int {
 		return -1
 	}
 
+	log.Printf("Successfully added phrase list '%s'\n", listName)
 	return 0
 
 }
