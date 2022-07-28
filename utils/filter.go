@@ -9,6 +9,9 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"gopkg.in/yaml.v2"
@@ -17,67 +20,67 @@ import (
 const helmChartGit = "https://github.com/e2guardian-angel/guardian-helm.git"
 
 type PhraseGroup struct {
-	GroupName string
-	Phrases   [][]string
-	Includes  []string
+	GroupName string     `json:"groupName"`
+	Phrases   [][]string `json:"phrases"`
+	Includes  []string   `json:"includes"`
 }
 
 type SiteGroup struct {
-	GroupName string
-	Sites     []string
+	GroupName string   `json:"groupName"`
+	Sites     []string `json:"sites"`
 }
 
 type RegexGroup struct {
-	GroupName string
-	Patterns  []string
+	GroupName string   `json:"groupName"`
+	Patterns  []string `json:"patterns"`
 }
 
 type TypeGroup struct {
-	GroupName string
-	Types     []string
+	GroupName string   `json:"groupName"`
+	Types     []string `json:"types"`
 }
 
 type ExtensionGroup struct {
-	GroupName  string
-	Extensions []string
+	GroupName  string   `json:"groupName"`
+	Extensions []string `json:"extensions"`
 }
 
 type PhraseList struct {
-	ListName string
-	Groups   []PhraseGroup
+	ListName string        `json:"listName"`
+	Groups   []PhraseGroup `json:"groups"`
 }
 
 type SiteLists struct {
-	ListName string
-	Groups   []SiteGroup
+	ListName string      `json:"listName"`
+	Groups   []SiteGroup `json:"groups"`
 }
 
 type RegexList struct {
-	ListName string
-	Groups   []RegexGroup
+	ListName string       `json:"listName"`
+	Groups   []RegexGroup `json:"groups"`
 }
 
 type TypeList struct {
-	ListName string
-	Groups   []TypeGroup
+	ListName string      `json:"listName"`
+	Groups   []TypeGroup `json:"groups"`
 }
 
 type ExtensionList struct {
-	ListName string
-	Groups   []ExtensionGroup
+	ListName string           `json:"listName"`
+	Groups   []ExtensionGroup `json:"groups"`
 }
 
 type AclRule struct {
-	Category string
-	Allow    bool
+	Category string `json:"category"`
+	Allow    bool   `json:"allow"`
 }
 
 type E2guardianConfig struct {
-	PhraseLists    []PhraseList
-	SiteLists      []SiteGroup
-	Regexpurlists  []RegexGroup
-	Mimetypelists  []TypeGroup
-	Extensionslist []ExtensionGroup
+	PhraseLists     []PhraseList     `json:"phraseLists"`
+	SiteLists       []SiteGroup      `json:"siteLists"`
+	Regexpurlists   []RegexGroup     `json:"regexpurllists"`
+	Mimetypelists   []TypeGroup      `json:"mimetypelists"`
+	Extensionslists []ExtensionGroup `json:"extensionslists"`
 }
 
 type TlsSecret struct {
@@ -150,7 +153,7 @@ func getRemoteHelmPath(host Host) string {
 	return path.Join(host.HomePath, ".guardian", "helm")
 }
 
-func checkoutHelm() error {
+func checkoutHelm(dumpOutput bool) error {
 
 	helmPath := getHelmPath()
 	/*
@@ -159,10 +162,17 @@ func checkoutHelm() error {
 	os.RemoveAll(helmPath)
 	os.MkdirAll(helmPath, 0o755)
 
-	log.Printf("Cloning helm chart into \"%s\"...\n", helmPath)
+	var outputStream *os.File
+	if dumpOutput {
+		outputStream = os.Stdout
+		log.Printf("Cloning helm chart into \"%s\"...\n", helmPath)
+	} else {
+		outputStream = nil
+	}
+
 	_, err := git.PlainClone(helmPath, false, &git.CloneOptions{
 		URL:      helmChartGit,
-		Progress: os.Stdout,
+		Progress: outputStream,
 	})
 
 	return err
@@ -254,15 +264,15 @@ type workerJson struct {
  */
 func initHostConfig(host Host) (FilterConfig, error) {
 
-	err := checkoutHelm()
-	if err != nil {
-		return FilterConfig{}, err
-	}
-
 	hostFilterConfPath := getHostFilterConfigPath(host.Name)
 
-	_, err = os.Stat(hostFilterConfPath)
+	_, err := os.Stat(hostFilterConfPath)
 	if os.IsNotExist(err) {
+
+		err = checkoutHelm(false)
+		if err != nil {
+			return FilterConfig{}, err
+		}
 
 		// Use default config
 		config, err := loadDefaultFilterConfig()
@@ -311,6 +321,11 @@ func copyHelmToRemote(host Host) error {
 	overrides := getHostFilterConfigPath(host.Name)
 	dstPath := getRemoteHelmPath(host)
 
+	err := checkoutHelm(true)
+	if err != nil {
+		return err
+	}
+
 	client, err := getHostSshClient(host)
 	if err != nil {
 		return err
@@ -332,10 +347,191 @@ func copyHelmToRemote(host Host) error {
 
 }
 
+// Set the field by name string
+// Copied from: https://gist.github.com/lelandbatey/a5c957b537bed39d1d6fb202c3b8de06
+func SetField(item interface{}, fieldName string, value interface{}) error {
+	v := reflect.ValueOf(item).Elem()
+	if !v.CanAddr() {
+		return fmt.Errorf("cannot assign to the item passed, item must be a pointer in order to assign")
+	}
+	// It's possible we can cache this, which is why precompute all these ahead of time.
+	findYamlName := func(t reflect.StructTag) (string, error) {
+		if jt, ok := t.Lookup("yaml"); ok {
+			return strings.Split(jt, ",")[0], nil
+		}
+		return "", fmt.Errorf("tag provided does not define a yaml tag", fieldName)
+	}
+	fieldNames := map[string]int{}
+	for i := 0; i < v.NumField(); i++ {
+		typeField := v.Type().Field(i)
+		tag := typeField.Tag
+		jname, _ := findYamlName(tag)
+		fieldNames[jname] = i
+	}
+
+	fieldNum, ok := fieldNames[fieldName]
+	if !ok {
+		return fmt.Errorf("field %s does not exist within the provided item", fieldName)
+	}
+	fieldVal := v.Field(fieldNum)
+	fieldVal.Set(reflect.ValueOf(value))
+	return nil
+}
+
+type e2gUpdateFunc func(e2gConf *E2guardianConfig) error
+
+/* update a phrase list */
+func updatePhraseList(targetName string, modifier e2gUpdateFunc) error {
+
+	config, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("Failed to load config: %s", err)
+	}
+
+	_, host := FindHost(config, targetName)
+	if host.Name != targetName {
+		return fmt.Errorf("Host %s doesn't exist, create it first", targetName)
+	}
+
+	hostConfig, err := initHostConfig(host)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize host filter config: %s", err)
+	}
+
+	e2gConfig := E2guardianConfig{}
+	err = json.Unmarshal([]byte(hostConfig.E2guardianConfig), &e2gConfig)
+	if err != nil {
+		return fmt.Errorf("e2guardian config is in a bad format: %s", err)
+	}
+
+	err = modifier(&e2gConfig)
+	if err != nil {
+		return fmt.Errorf("failed to update e2guardian config: %s", err)
+	}
+
+	var e2gConfigData []byte
+	e2gConfigData, err = json.Marshal(e2gConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal e2guardian config to json: ", err)
+	}
+
+	hostConfig.E2guardianConfig = string(e2gConfigData)
+	return writeHostFilterConfig(targetName, hostConfig)
+
+}
+
+func findPhraseList(e2gConf *E2guardianConfig, listName string) (int, *PhraseList) {
+	var phraseList *PhraseList
+	var index int
+	for i, value := range e2gConf.PhraseLists {
+		if listName == value.ListName {
+			phraseList = &value
+			index = i
+		}
+	}
+	if phraseList.ListName != listName {
+		return -1, nil
+	}
+	return index, phraseList
+}
+
+func findPhraseGroup(list *PhraseList, groupName string) (int, *PhraseGroup) {
+	var phraseGroup *PhraseGroup
+	var index int
+	for i, value := range list.Groups {
+		if groupName == value.GroupName {
+			phraseGroup = &value
+			index = i
+		}
+	}
+	if phraseGroup.GroupName != groupName {
+		return -1, nil
+	}
+	return index, phraseGroup
+}
+
+func findPhrase(group *PhraseGroup, phrase string) int {
+	index := -1
+	phraseA := strings.Split(phrase, ":")
+	sort.Strings(phraseA)
+	for i, phraseB := range group.Phrases {
+		sort.Strings(phraseB)
+		if len(phraseA) != len(phraseB) {
+			continue
+		}
+		for j, term := range phraseA {
+			if term != phraseB[j] {
+				continue
+			}
+			if j == len(phraseA)-1 {
+				index = i
+			}
+		}
+	}
+	return index
+}
+
 /*
  * CLI methods
  */
+/* Add a new phrase list */
+func AddPhraseList(listName string, targetName string) int {
 
+	err := updatePhraseList(targetName, func(e2gConf *E2guardianConfig) error {
+		e2gConf.PhraseLists = append(e2gConf.PhraseLists, PhraseList{
+			ListName: listName,
+			Groups:   []PhraseGroup{},
+		})
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+		return -1
+	}
+
+	return 0
+
+}
+
+/* Add phrase to existing list */
+func AddPhraseToList(listName string, phrase string, group string, targetName string) int {
+
+	groupName := "default"
+	if group != "" {
+		groupName = group
+	}
+
+	err := updatePhraseList(targetName, func(e2gConf *E2guardianConfig) error {
+
+		index, phraseList := findPhraseList(e2gConf, listName)
+		if index == -1 {
+			return fmt.Errorf("Phrase list '%s' does not exist in the config", listName)
+		}
+		index, phraseGroup := findPhraseGroup(phraseList, groupName)
+		if index == -1 {
+			// Create a new group
+			phraseList.Groups = append(phraseList.Groups, PhraseGroup{
+				GroupName: groupName,
+			})
+			index, phraseGroup = findPhraseGroup(phraseList, groupName)
+		}
+		phraseIndex := findPhrase(phraseGroup, phrase)
+		if phraseIndex != -1 {
+			return fmt.Errorf("Phrase already exists")
+		}
+		phraseGroup.Phrases = append(phraseGroup.Phrases, strings.Split(phrase, ","))
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+		return -1
+	}
+
+	return 0
+
+}
+
+/* Deploy changes to target */
 func Deploy(name string) int {
 
 	config, err := loadConfig()
@@ -375,6 +571,7 @@ func Deploy(name string) int {
 		"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
 		"helm upgrade --install --create-namespace -f overrides.yaml -n filter guardian-angel guardian-angel",
 		"dd if=/dev/null of=overrides.yaml",
+		"rm overrides.yaml",
 	}, true)
 	if err != nil {
 		log.Fatal("Failed to deploy filter config: ", err)

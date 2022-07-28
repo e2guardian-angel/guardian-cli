@@ -59,16 +59,18 @@ var CLI struct {
 			AddPhrase struct {
 				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify" required:"true"`
 				Phrase string `arg:"" name:"phrase" help:"Phrase to add to the list" type:"comma separated list" required:"true"`
-				Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
+				Group  string `name:"group" help:"name of phrase group"`
+				//Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
 			} `cmd:"" name:"add-phrase" help:"Add a phrase to an existing list"`
 			RemovePhrase struct {
 				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
 				Phrase string `arg:"" name:"phrase" help:"Name of phrase to remove from an existing list" type:"comma separated list"`
+				Group  string `name:"group" help:"name of phrase group"`
 			} `cmd:"" name:"remove-phrase" help:"Remove a phrase from an existing list"`
 			AddList struct {
-				Name        string `arg:"" name:"name" help:"Name of the phrase list to create"`
-				Weighted    bool   `name:"weighted" help:"Indicates that phrase list is weiighted" type:"true/false" default:"false"`
-				Naughtiness int    `name:"naughtiness" help:"For weighted lists, the naughtiness limit" type:"integer"`
+				Name string `arg:"" name:"name" help:"Name of the phrase list to create"`
+				//Weighted    bool   `name:"weighted" help:"Indicates that phrase list is weiighted" type:"true/false" default:"false"`
+				//Naughtiness int    `name:"naughtiness" help:"For weighted lists, the naughtiness limit" type:"integer"`
 			} `cmd:"" name:"add-list" help:"Create a new phrase list"`
 			RemoveList struct {
 				Name string `arg:"" name:"name" help:"Name of the phrase list to delete"`
@@ -103,6 +105,10 @@ func main() {
 		code = utils.TestSshCommand(CLI.Target.Test.Name)
 	case "filter deploy":
 		code = utils.Deploy(CLI.Filter.Target)
+	case "filter phrase-list add-list <name>":
+		code = utils.AddPhraseList(CLI.Filter.PhraseList.AddList.Name, CLI.Filter.Target)
+	case "filter phrase-list add-phrase <name> <phrase>":
+		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, CLI.Filter.PhraseList.AddPhrase.Phrase, CLI.Filter.PhraseList.AddPhrase.Group, CLI.Filter.Target)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1
