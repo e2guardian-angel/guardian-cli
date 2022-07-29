@@ -421,36 +421,25 @@ func updatePhraseList(targetName string, modifier e2gUpdateFunc) error {
 }
 
 func findPhraseList(e2gConf *E2guardianConfig, listName string) (int, *PhraseList) {
-	var phraseList *PhraseList
-	var index int
 	for i, value := range e2gConf.PhraseLists {
 		if listName == value.ListName {
-			phraseList = &value
-			index = i
-			return index, phraseList
+			return i, &e2gConf.PhraseLists[i]
 		}
 	}
 	return -1, nil
 }
 
 func findPhraseGroup(list *PhraseList, groupName string) (int, *PhraseGroup) {
-	var phraseGroup *PhraseGroup
-	var index int
 	for i, value := range list.Groups {
 		if groupName == value.GroupName {
-			phraseGroup = &value
-			index = i
+			return i, &list.Groups[i]
 		}
 	}
-	if phraseGroup.GroupName != groupName {
-		return -1, nil
-	}
-	return index, phraseGroup
+	return -1, nil
 }
 
 func findPhrase(group *PhraseGroup, phrase string) int {
-	index := -1
-	phraseA := strings.Split(phrase, ":")
+	phraseA := strings.Split(phrase, ",")
 	sort.Strings(phraseA)
 	for i, phraseB := range group.Phrases {
 		sort.Strings(phraseB)
@@ -462,11 +451,12 @@ func findPhrase(group *PhraseGroup, phrase string) int {
 				continue
 			}
 			if j == len(phraseA)-1 {
-				index = i
+				// if we reached the end of the terms, then this phrase matches
+				return i
 			}
 		}
 	}
-	return index
+	return -1
 }
 
 /*
@@ -506,23 +496,26 @@ func AddPhraseToList(listName string, phrase string, group string, targetName st
 
 	err := updatePhraseList(targetName, func(e2gConf *E2guardianConfig) error {
 
-		index, phraseList := findPhraseList(e2gConf, listName)
-		if index == -1 {
-			return fmt.Errorf("Phrase list '%s' does not exist in the config", listName)
+		phraseListIndex, phraseList := findPhraseList(e2gConf, listName)
+		if phraseListIndex == -1 {
+			return fmt.Errorf("phrase list '%s' does not exist in the config", listName)
 		}
-		index, phraseGroup := findPhraseGroup(phraseList, groupName)
-		if index == -1 {
+		phraseGroupIndex, phraseGroup := findPhraseGroup(phraseList, groupName)
+		if phraseGroupIndex == -1 {
 			// Create a new group
 			phraseList.Groups = append(phraseList.Groups, PhraseGroup{
 				GroupName: groupName,
+				Phrases:   [][]string{},
+				Includes:  []string{},
 			})
-			index, phraseGroup = findPhraseGroup(phraseList, groupName)
+			phraseGroupIndex, phraseGroup = findPhraseGroup(phraseList, groupName)
 		}
 		phraseIndex := findPhrase(phraseGroup, phrase)
 		if phraseIndex != -1 {
-			return fmt.Errorf("Phrase already exists")
+			return fmt.Errorf("phrase already exists")
 		}
 		phraseGroup.Phrases = append(phraseGroup.Phrases, strings.Split(phrase, ","))
+		//e2gConf.PhraseLists[phraseListIndex] = *phraseList
 		return nil
 	})
 	if err != nil {
