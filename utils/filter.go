@@ -20,67 +20,72 @@ import (
 const helmChartGit = "https://github.com/e2guardian-angel/guardian-helm.git"
 
 type PhraseGroup struct {
-	GroupName string     `json:"groupName"`
-	Phrases   [][]string `json:"phrases"`
-	Includes  []string   `json:"includes"`
+	GroupName string     `yaml:"groupName"`
+	Phrases   [][]string `yaml:"phrases"`
+	Includes  []string   `yaml:"includes"`
 }
 
 type SiteGroup struct {
-	GroupName string   `json:"groupName"`
-	Sites     []string `json:"sites"`
+	GroupName string   `yaml:"groupName"`
+	Sites     []string `yaml:"sites"`
 }
 
 type RegexGroup struct {
-	GroupName string   `json:"groupName"`
-	Patterns  []string `json:"patterns"`
+	GroupName string   `yaml:"groupName"`
+	Patterns  []string `yaml:"patterns"`
 }
 
 type TypeGroup struct {
-	GroupName string   `json:"groupName"`
-	Types     []string `json:"types"`
+	GroupName string   `yaml:"groupName"`
+	Types     []string `yaml:"types"`
 }
 
 type ExtensionGroup struct {
-	GroupName  string   `json:"groupName"`
-	Extensions []string `json:"extensions"`
+	GroupName  string   `yaml:"groupName"`
+	Extensions []string `yaml:"extensions"`
 }
 
 type PhraseList struct {
-	ListName string        `json:"listName"`
-	Groups   []PhraseGroup `json:"groups"`
+	ListName string        `yaml:"listName"`
+	Groups   []PhraseGroup `yaml:"groups"`
 }
 
 type SiteLists struct {
-	ListName string      `json:"listName"`
-	Groups   []SiteGroup `json:"groups"`
+	ListName string      `yaml:"listName"`
+	Groups   []SiteGroup `yaml:"groups"`
 }
 
 type RegexList struct {
-	ListName string       `json:"listName"`
-	Groups   []RegexGroup `json:"groups"`
+	ListName string       `yaml:"listName"`
+	Groups   []RegexGroup `yaml:"groups"`
 }
 
 type TypeList struct {
-	ListName string      `json:"listName"`
-	Groups   []TypeGroup `json:"groups"`
+	ListName string      `yaml:"listName"`
+	Groups   []TypeGroup `yaml:"groups"`
 }
 
 type ExtensionList struct {
-	ListName string           `json:"listName"`
-	Groups   []ExtensionGroup `json:"groups"`
+	ListName string           `yaml:"listName"`
+	Groups   []ExtensionGroup `yaml:"groups"`
 }
 
-type AclRule struct {
-	Category string `json:"category"`
-	Allow    bool   `json:"allow"`
+type AllowRule struct {
+	Category string `yaml:"category"`
+	Allow    bool   `yaml:"allow"`
+}
+
+type DecryptRule struct {
+	Category string `yaml:"category"`
+	Decrypt  bool   `yaml:"allow"`
 }
 
 type E2guardianConfig struct {
-	PhraseLists     []PhraseList     `json:"phraseLists"`
-	SiteLists       []SiteGroup      `json:"siteLists"`
-	Regexpurlists   []RegexGroup     `json:"regexpurllists"`
-	Mimetypelists   []TypeGroup      `json:"mimetypelists"`
-	Extensionslists []ExtensionGroup `json:"extensionslists"`
+	PhraseLists     []PhraseList     `yaml:"phraseLists"`
+	SiteLists       []SiteGroup      `yaml:"siteLists"`
+	Regexpurlists   []RegexGroup     `yaml:"regexpurllists"`
+	Mimetypelists   []TypeGroup      `yaml:"mimetypelists"`
+	Extensionslists []ExtensionGroup `yaml:"extensionslists"`
 }
 
 type TlsSecret struct {
@@ -93,48 +98,29 @@ type FilterConfig struct {
 	MasterNode string `yaml:"masterNode"`
 	VolumePath string `yaml:"volumePath"`
 	// Network
-	LocalNetwork     string `yaml:"localNetwork"`
-	GatewayIP        string `yaml:"gatewayIP"`
-	LocalTransparent bool   `yaml:"localTransparent"`
+	LocalNetwork string `yaml:"localNetwork"`
 	// Lookup service
 	GuardianReplicas int    `yaml:"guardianReplicas"`
 	AclVolumeSize    string `yaml:"aclVolumeSize"`
 	// Filter
-	SquidPublicPort  int    `yaml:"squidPublicPort"`
-	HttpsEnabled     bool   `yaml:"httpsEnabled"`
-	Transparent      bool   `yaml:"transparent"`
-	DecryptHTTPS     bool   `yaml:"decryptHTTPS"`
-	AllowRules       string `yaml:"allowRules"`
-	DecryptRules     string `yaml:"decryptRules"`
-	E2guardianConfig string `yaml:"e2guardianConfig"`
-	CacheTTL         int    `yaml:"cacheTTL"`
-	MaxKeys          int    `yaml:"maxKeys"`
-	FilterReplicas   int    `yaml:"filterReplicas"`
-	PhraseVolumeSize string `yaml:"phraseVolumeSize"`
+	SquidPublicPort int              `yaml:"squidPublicPort"`
+	Transparent     bool             `yaml:"transparent"`
+	DecryptHTTPS    bool             `yaml:"decryptHTTPS"`
+	AllowRules      []AllowRule      `yaml:"allowRules"`
+	DecryptRules    []DecryptRule    `yaml:"decryptRules"`
+	E2guardianConf  E2guardianConfig `yaml:"e2guardianConfig"`
+	CacheTTL        int              `yaml:"cacheTTL"`
+	MaxKeys         int              `yaml:"maxKeys"`
+	FilterReplicas  int              `yaml:"filterReplicas"`
 	// DNS
 	SafeSearchEnforced bool `yaml:"safeSearchEnforced"`
 	PublicDnsPort      int  `yaml:"publicDnsPort"`
-	ReverseDnsPort     int  `yaml:"reverseDnsPort"`
 	ReverseDnsReplicas int  `yaml:"reverseDnsReplicas"`
 	// Postgres
-	PostgresUser       string `yaml:"postgresUser"`
-	PostgresDbName     string `yaml:"postgresDbName"`
-	DbServicePort      int    `yaml:"dbServicePort"`
 	GuardianDbReplicas int    `yaml:"guardianDbReplicas"`
 	DbPassword         string `yaml:"dbPassword"`
 	DbVolumeSize       string `yaml:"dbVolumeSize"`
-	// CA cert info
-	CaCountry    string `yaml:"caCountry"`
-	CaState      string `yaml:"caState"`
-	CaCity       string `yaml:"caCity"`
-	CaOrg        string `yaml:"caOrg"`
-	CaOrgUnit    string `yaml:"caOrgUnit"`
-	CaCommonName string `yaml:"caCommonName"`
-	CaEmail      string `yaml:"caEmail"`
-	CaValidDays  int    `yaml:"caValidDays"`
 	// Redis config
-	RedisHost     string    `yaml:"redisHost"`
-	RedisPort     int       `yaml:"redisPort"`
 	RedisReplicas int       `yaml:"redisReplicas"`
 	RedisPassword string    `yaml:"redisPassword"`
 	Tls           TlsSecret `yaml:"tls,omitempty"`
@@ -378,85 +364,66 @@ func SetField(item interface{}, fieldName string, value interface{}) error {
 	return nil
 }
 
-type e2gUpdateFunc func(e2gConf *E2guardianConfig) error
+func getHostFilterConfig(hostName string) (FilterConfig, error) {
 
-/* update a phrase list */
-func updatePhraseList(targetName string, modifier e2gUpdateFunc) error {
-
-	config, err := loadConfig()
+	guardianConf, err := loadConfig()
 	if err != nil {
-		return fmt.Errorf("Failed to load config: %s", err)
+		return FilterConfig{}, err
 	}
 
-	_, host := FindHost(config, targetName)
-	if host.Name != targetName {
-		return fmt.Errorf("Host %s doesn't exist, create it first", targetName)
+	_, host := FindHost(guardianConf, hostName)
+	if host.Name != hostName {
+		return FilterConfig{}, fmt.Errorf("Host '%s' is not configured", hostName)
 	}
 
-	hostConfig, err := initHostConfig(host)
+	filterConfig, err := initHostConfig(host)
 	if err != nil {
-		return fmt.Errorf("Failed to initialize host filter config: %s", err)
+		return FilterConfig{}, err
 	}
 
-	e2gConfig := E2guardianConfig{}
-	err = json.Unmarshal([]byte(hostConfig.E2guardianConfig), &e2gConfig)
-	if err != nil {
-		return fmt.Errorf("e2guardian config is in a bad format: %s", err)
-	}
-
-	err = modifier(&e2gConfig)
-	if err != nil {
-		return fmt.Errorf("failed to update e2guardian config: %s", err)
-	}
-
-	var e2gConfigData []byte
-	e2gConfigData, err = json.Marshal(e2gConfig)
-	if err != nil {
-		return fmt.Errorf("failed to marshal e2guardian config to json: ", err)
-	}
-
-	hostConfig.E2guardianConfig = string(e2gConfigData)
-	return writeHostFilterConfig(targetName, hostConfig)
-
+	return filterConfig, nil
 }
 
-func findPhraseList(e2gConf *E2guardianConfig, listName string) (int, *PhraseList) {
-	for i, value := range e2gConf.PhraseLists {
-		if listName == value.ListName {
-			return i, &e2gConf.PhraseLists[i]
+func (config *E2guardianConfig) findPhraseList(listName string) *PhraseList {
+	for _, list := range config.PhraseLists {
+		if list.ListName == listName {
+			return &list
 		}
 	}
-	return -1, nil
+	return nil
 }
 
-func findPhraseGroup(list *PhraseList, groupName string) (int, *PhraseGroup) {
-	for i, value := range list.Groups {
-		if groupName == value.GroupName {
-			return i, &list.Groups[i]
+func (list *PhraseList) findPhraseGroup(groupName string) *PhraseGroup {
+	for _, group := range list.Groups {
+		if group.GroupName == groupName {
+			return &group
 		}
 	}
-	return -1, nil
+	return nil
 }
 
-func findPhrase(group *PhraseGroup, phrase string) int {
-	phraseA := strings.Split(phrase, ",")
-	sort.Strings(phraseA)
-	for i, phraseB := range group.Phrases {
-		sort.Strings(phraseB)
-		if len(phraseA) != len(phraseB) {
-			continue
-		}
-		for j, term := range phraseA {
-			if term != phraseB[j] {
-				continue
-			}
-			if j == len(phraseA)-1 {
-				// if we reached the end of the terms, then this phrase matches
-				return i
+func phrasesMatch(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	} else {
+		sort.Strings(a)
+		sort.Strings(b)
+		for i, term := range a {
+			if b[i] != term {
+				return false
 			}
 		}
+		return true
 	}
-	return -1
+}
+
+func (group *PhraseGroup) findPhrase(phrase []string) *[]string {
+	for _, currentPhrase := range group.Phrases {
+		if phrasesMatch(currentPhrase, phrase) {
+			return &currentPhrase
+		}
+	}
+	return nil
 }
 
 /*
@@ -465,19 +432,23 @@ func findPhrase(group *PhraseGroup, phrase string) int {
 /* Add a new phrase list */
 func AddPhraseList(listName string, targetName string) int {
 
-	err := updatePhraseList(targetName, func(e2gConf *E2guardianConfig) error {
-		index, _ := findPhraseList(e2gConf, listName)
-		if index != -1 {
-			return fmt.Errorf("list %s already exists", listName)
-		}
-		e2gConf.PhraseLists = append(e2gConf.PhraseLists, PhraseList{
-			ListName: listName,
-			Groups:   []PhraseGroup{},
-		})
-		return nil
-	})
+	config, err := getHostFilterConfig(targetName)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	phraseList := config.E2guardianConf.findPhraseList(listName)
+	if phraseList != nil {
+		log.Fatalf("Phrase list '%s' already exists", listName)
+		return -1
+	}
+
+	config.E2guardianConf.PhraseLists = append(config.E2guardianConf.PhraseLists, PhraseList{ListName: listName})
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
 		return -1
 	}
 
@@ -489,37 +460,34 @@ func AddPhraseList(listName string, targetName string) int {
 /* Add phrase to existing list */
 func AddPhraseToList(listName string, phrase string, group string, targetName string) int {
 
-	groupName := "default"
-	if group != "" {
-		groupName = group
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
 	}
 
-	err := updatePhraseList(targetName, func(e2gConf *E2guardianConfig) error {
+	phraseList := config.E2guardianConf.findPhraseList(listName)
+	if phraseList == nil {
+		log.Fatalf("Phrase list '%s' does not exist", listName)
+		return -1
+	}
 
-		phraseListIndex, phraseList := findPhraseList(e2gConf, listName)
-		if phraseListIndex == -1 {
-			return fmt.Errorf("phrase list '%s' does not exist in the config", listName)
+	phraseGroup := phraseList.findPhraseGroup(group)
+	if phraseGroup == nil {
+		// Add this phrase group
+		phraseList.Groups = append(phraseList.Groups, PhraseGroup{GroupName: group})
+		phraseGroup = phraseList.findPhraseGroup(group)
+	}
+
+	terms := strings.Split(phrase, ",")
+	existingPhrase := phraseGroup.findPhrase(terms)
+	if existingPhrase != nil {
+		// no name group displayed as 'default'
+		groupName := "default"
+		if group != "" {
+			groupName = group
 		}
-		phraseGroupIndex, phraseGroup := findPhraseGroup(phraseList, groupName)
-		if phraseGroupIndex == -1 {
-			// Create a new group
-			phraseList.Groups = append(phraseList.Groups, PhraseGroup{
-				GroupName: groupName,
-				Phrases:   [][]string{},
-				Includes:  []string{},
-			})
-			phraseGroupIndex, phraseGroup = findPhraseGroup(phraseList, groupName)
-		}
-		phraseIndex := findPhrase(phraseGroup, phrase)
-		if phraseIndex != -1 {
-			return fmt.Errorf("phrase already exists")
-		}
-		phraseGroup.Phrases = append(phraseGroup.Phrases, strings.Split(phrase, ","))
-		//e2gConf.PhraseLists[phraseListIndex] = *phraseList
-		return nil
-	})
-	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Phrase '%s' already exists in group '%s' of phrase list '%s'", phrase, groupName, listName)
 		return -1
 	}
 
