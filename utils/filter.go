@@ -11,6 +11,7 @@ import (
 	"path"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -148,13 +149,8 @@ func checkoutHelm(dumpOutput bool) error {
 	os.RemoveAll(helmPath)
 	os.MkdirAll(helmPath, 0o755)
 
-	var outputStream *os.File
-	if dumpOutput {
-		outputStream = os.Stdout
-		log.Printf("Cloning helm chart into \"%s\"...\n", helmPath)
-	} else {
-		outputStream = nil
-	}
+	outputStream := os.Stdout
+	log.Printf("Cloning helm chart into \"%s\"...\n", helmPath)
 
 	_, err := git.PlainClone(helmPath, false, &git.CloneOptions{
 		URL:      helmChartGit,
@@ -385,18 +381,20 @@ func getHostFilterConfig(hostName string) (FilterConfig, error) {
 }
 
 func (config *E2guardianConfig) findPhraseList(listName string) *PhraseList {
-	for _, list := range config.PhraseLists {
+	for i := range config.PhraseLists {
+		list := &config.PhraseLists[i]
 		if list.ListName == listName {
-			return &list
+			return list
 		}
 	}
 	return nil
 }
 
 func (list *PhraseList) findPhraseGroup(groupName string) *PhraseGroup {
-	for _, group := range list.Groups {
+	for i := range list.Groups {
+		group := &list.Groups[i]
 		if group.GroupName == groupName {
-			return &group
+			return group
 		}
 	}
 	return nil
@@ -491,8 +489,76 @@ func AddPhraseToList(listName string, phrase string, group string, targetName st
 		return -1
 	}
 
+	// TODO: format terms for e2guardian
+
+	phraseGroup.Phrases = append(phraseGroup.Phrases, terms)
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully added phrase to list '%s'\n", listName)
 	return 0
 
+}
+
+/* Dump a given phrase list */
+func ShowPhraseList(listName string, targetName string, group string) int {
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	phraseList := config.E2guardianConf.findPhraseList(listName)
+	if phraseList == nil {
+		log.Fatalf("Phrase list '%s' does not exist for target '%s", listName, targetName)
+		return -1
+	}
+
+	var groups []PhraseGroup
+
+	if group != "" {
+		phraseGroup := phraseList.findPhraseGroup(group)
+		if phraseGroup == nil {
+			log.Fatalf("Group '%s' does not exist for phrase list '%s'", group, listName)
+			return -1
+		}
+		groups = []PhraseGroup{*phraseGroup}
+	} else {
+		groups = phraseList.Groups
+	}
+
+	for i := range groups {
+		group := groups[i]
+		log.Printf("Group: %s", group.GroupName)
+		log.Printf("=== INCLUDES ===")
+		// Dump includes
+		for j := range group.Includes {
+			include := group.Includes[j]
+			log.Println(include)
+		}
+		log.Printf("=== PHRASES ===")
+		for j := range group.Phrases {
+			phrase := group.Phrases[j]
+			phraseString := ""
+			for k := range phrase {
+				term := phrase[k]
+				weight, err := strconv.Atoi(term)
+				if k == len(phrase)-1 && err == nil {
+					phraseString = fmt.Sprintf("%s (weight=%d)", phraseString, weight)
+				} else {
+					phraseString = fmt.Sprintf("%s<%s>", phraseString, term)
+				}
+			}
+			log.Println(phraseString)
+		}
+	}
+
+	return 0
 }
 
 /* Deploy changes to target */

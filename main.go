@@ -62,6 +62,11 @@ var CLI struct {
 				Group  string `name:"group" help:"name of phrase group"`
 				//Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
 			} `cmd:"" name:"add-phrase" help:"Add a phrase to an existing list"`
+			AddInclude struct {
+				Name     string `arg:"" name:"name" help:"Name of the phrase list to modify" required:"true"`
+				Filename string `arg:"" name:"filename" help:"Name of the phrase list to modify" required:"true"`
+				Group    string `name:"group" help:"name of phrase group"`
+			} `cmd:"" name:"include-phraselist" help:"Include phraselist file to an existing list"`
 			RemovePhrase struct {
 				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
 				Phrase string `arg:"" name:"phrase" help:"Name of phrase to remove from an existing list" type:"comma separated list"`
@@ -75,6 +80,10 @@ var CLI struct {
 			RemoveList struct {
 				Name string `arg:"" name:"name" help:"Name of the phrase list to delete"`
 			} `cmd:"" name:"remove-list" help:"Delete an existing phrase list"`
+			Show struct {
+				Name  string `arg:"" name:"name" help:"Name of the phrase list to show"`
+				Group string `name:"group" help:"name of phrase group"`
+			} `cmd:"" name:"show" help:"Dump the contents of a phrase list"`
 		} `cmd:"" name:"phrase-list" help:"Backup target host's filter configuration"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
 }
@@ -109,6 +118,8 @@ func main() {
 		code = utils.AddPhraseList(CLI.Filter.PhraseList.AddList.Name, CLI.Filter.Target)
 	case "filter phrase-list add-phrase <name> <phrase>":
 		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, CLI.Filter.PhraseList.AddPhrase.Phrase, CLI.Filter.PhraseList.AddPhrase.Group, CLI.Filter.Target)
+	case "filter phrase-list show <name>":
+		code = utils.ShowPhraseList(CLI.Filter.PhraseList.Show.Name, CLI.Filter.Target, CLI.Filter.PhraseList.Show.Group)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1
