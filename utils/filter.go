@@ -456,7 +456,7 @@ func AddPhraseList(listName string, targetName string) int {
 }
 
 /* Add phrase to existing list */
-func AddPhraseToList(listName string, phrase string, group string, targetName string) int {
+func AddPhraseToList(listName string, phrase string, group string, targetName string, weight int) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
@@ -490,7 +490,9 @@ func AddPhraseToList(listName string, phrase string, group string, targetName st
 	}
 
 	// TODO: format terms for e2guardian
-
+	if weight != 0 {
+		terms = append(terms, strconv.Itoa(weight))
+	}
 	phraseGroup.Phrases = append(phraseGroup.Phrases, terms)
 
 	err = writeHostFilterConfig(targetName, config)

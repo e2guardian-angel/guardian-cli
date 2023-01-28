@@ -60,7 +60,7 @@ var CLI struct {
 				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify" required:"true"`
 				Phrase string `arg:"" name:"phrase" help:"Phrase to add to the list" type:"comma separated list" required:"true"`
 				Group  string `name:"group" help:"name of phrase group"`
-				//Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
+				Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
 			} `cmd:"" name:"add-phrase" help:"Add a phrase to an existing list"`
 			AddInclude struct {
 				Name     string `arg:"" name:"name" help:"Name of the phrase list to modify" required:"true"`
@@ -117,7 +117,7 @@ func main() {
 	case "filter phrase-list add-list <name>":
 		code = utils.AddPhraseList(CLI.Filter.PhraseList.AddList.Name, CLI.Filter.Target)
 	case "filter phrase-list add-phrase <name> <phrase>":
-		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, CLI.Filter.PhraseList.AddPhrase.Phrase, CLI.Filter.PhraseList.AddPhrase.Group, CLI.Filter.Target)
+		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, CLI.Filter.PhraseList.AddPhrase.Phrase, CLI.Filter.PhraseList.AddPhrase.Group, CLI.Filter.Target, CLI.Filter.PhraseList.AddPhrase.Weight)
 	case "filter phrase-list show <name>":
 		code = utils.ShowPhraseList(CLI.Filter.PhraseList.Show.Name, CLI.Filter.Target, CLI.Filter.PhraseList.Show.Group)
 	default:
