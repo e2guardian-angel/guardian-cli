@@ -81,7 +81,7 @@ var CLI struct {
 				Name string `arg:"" name:"name" help:"Name of the phrase list to delete"`
 			} `cmd:"" name:"remove-list" help:"Delete an existing phrase list"`
 			Show struct {
-				Name  string `arg:"" name:"name" help:"Name of the phrase list to show"`
+				Name  string `name:"name" help:"Name of the phrase list to show"`
 				Group string `name:"group" help:"name of phrase group"`
 			} `cmd:"" name:"show" help:"Dump the contents of a phrase list"`
 		} `cmd:"" name:"phrase-list" help:"Backup target host's filter configuration"`
@@ -116,9 +116,13 @@ func main() {
 		code = utils.Deploy(CLI.Filter.Target)
 	case "filter phrase-list add-list <name>":
 		code = utils.AddPhraseList(CLI.Filter.PhraseList.AddList.Name, CLI.Filter.Target)
+	case "filter phrase-list remove-list <name>":
+		code = utils.DeletePhraseList(CLI.Filter.PhraseList.RemoveList.Name, CLI.Filter.Target)
 	case "filter phrase-list add-phrase <name> <phrase>":
 		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, CLI.Filter.PhraseList.AddPhrase.Phrase, CLI.Filter.PhraseList.AddPhrase.Group, CLI.Filter.Target, CLI.Filter.PhraseList.AddPhrase.Weight)
-	case "filter phrase-list show <name>":
+	case "filter phrase-list remove-phrase <name> <phrase>":
+		code = utils.DeletePhraseFromList(CLI.Filter.PhraseList.RemovePhrase.Name, CLI.Filter.PhraseList.RemovePhrase.Phrase, CLI.Filter.PhraseList.RemovePhrase.Group, CLI.Filter.Target)
+	case "filter phrase-list show":
 		code = utils.ShowPhraseList(CLI.Filter.PhraseList.Show.Name, CLI.Filter.Target, CLI.Filter.PhraseList.Show.Group)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")

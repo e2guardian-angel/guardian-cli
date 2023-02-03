@@ -424,6 +424,16 @@ func (group *PhraseGroup) findPhrase(phrase []string) *[]string {
 	return nil
 }
 
+func (group *PhraseGroup) removePhrase(phrase []string) [][]string {
+	for i, currentPhrase := range group.Phrases {
+		if phrasesMatch(currentPhrase, phrase) {
+			group.Phrases = append(group.Phrases[:i], group.Phrases[i+1:]...)
+			return group.Phrases
+		}
+	}
+	return nil
+}
+
 /*
  * CLI methods
  */
@@ -452,6 +462,36 @@ func AddPhraseList(listName string, targetName string) int {
 
 	log.Printf("Successfully added phrase list '%s'\n", listName)
 	return 0
+
+}
+
+/* Add a new phrase list */
+func DeletePhraseList(listName string, targetName string) int {
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	for i := range config.E2guardianConf.PhraseLists {
+		if config.E2guardianConf.PhraseLists[i].ListName == listName {
+			config.E2guardianConf.PhraseLists = append(
+				config.E2guardianConf.PhraseLists[:i],
+				config.E2guardianConf.PhraseLists[i+1:]...)
+			log.Printf("Successfully deleted list %s", listName)
+			err = writeHostFilterConfig(targetName, config)
+			if err != nil {
+				log.Fatal("Failed to write host config: ", err)
+				return -1
+			}
+			return 0
+		}
+	}
+
+	// If we are here, then the phrase list doesn't exist
+	log.Fatalf("Phrase list '%s' doesn't exist\n", listName)
+	return -1
 
 }
 
@@ -506,12 +546,67 @@ func AddPhraseToList(listName string, phrase string, group string, targetName st
 
 }
 
-/* Dump a given phrase list */
+/* Add phrase to existing list */
+func DeletePhraseFromList(listName string, phrase string, group string, targetName string) int {
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	phraseList := config.E2guardianConf.findPhraseList(listName)
+	if phraseList == nil {
+		log.Fatalf("Phrase list '%s' does not exist", listName)
+		return -1
+	}
+
+	phraseGroup := phraseList.findPhraseGroup(group)
+	if phraseGroup == nil {
+		// Add this phrase group
+		phraseList.Groups = append(phraseList.Groups, PhraseGroup{GroupName: group})
+		phraseGroup = phraseList.findPhraseGroup(group)
+	}
+
+	terms := strings.Split(phrase, ",")
+	existingPhrase := phraseGroup.findPhrase(terms)
+	if existingPhrase == nil {
+		// no name group displayed as 'default'
+		groupName := "default"
+		if group != "" {
+			groupName = group
+		}
+		log.Fatalf("Phrase '%s' doesn't exist in group '%s' of phrase list '%s'", phrase, groupName, listName)
+		return -1
+	} else {
+		// Delete it here
+		phraseGroup.Phrases = phraseGroup.removePhrase(terms)
+		err = writeHostFilterConfig(targetName, config)
+		if err != nil {
+			log.Fatal("Failed to write host config: ", err)
+			return -1
+		}
+		log.Printf("Successfully deleted phrase from list '%s'\n", listName)
+		return 0
+	}
+
+}
+
+/* Dump a given phrase list, or list all of them */
 func ShowPhraseList(listName string, targetName string, group string) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
 		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	if listName == "" {
+		// Just show the names of all phrase lists
+		log.Println("=== PHRASE LISTS ===")
+		for i := range config.E2guardianConf.PhraseLists {
+			log.Println(config.E2guardianConf.PhraseLists[i].ListName)
+		}
 		return -1
 	}
 
