@@ -428,10 +428,27 @@ func (group *PhraseGroup) removePhrase(phrase []string) [][]string {
 	for i, currentPhrase := range group.Phrases {
 		if phrasesMatch(currentPhrase, phrase) {
 			group.Phrases = append(group.Phrases[:i], group.Phrases[i+1:]...)
-			return group.Phrases
 		}
 	}
-	return nil
+	return group.Phrases
+}
+
+func (group *PhraseGroup) findInclude(fileName string) string {
+	for _, fname := range group.Includes {
+		if fname == fileName {
+			return fname
+		}
+	}
+	return ""
+}
+
+func (group *PhraseGroup) removeInclude(fileName string) []string {
+	for i, fname := range group.Includes {
+		if fname == fileName {
+			group.Includes = append(group.Includes[:i], group.Includes[i+1:]...)
+		}
+	}
+	return group.Includes
 }
 
 /*
@@ -589,6 +606,88 @@ func DeletePhraseFromList(listName string, phrase string, group string, targetNa
 		log.Printf("Successfully deleted phrase from list '%s'\n", listName)
 		return 0
 	}
+
+}
+
+/* Add an include to a phrase list */
+func AddInclude(listName string, group string, fileInclude string, targetName string) int {
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: \n", err)
+		return -1
+	}
+
+	phraseList := config.E2guardianConf.findPhraseList(listName)
+	if phraseList == nil {
+		log.Fatalf("Phrase list '%s' does not exist\n", listName)
+		return -1
+	}
+
+	phraseGroup := phraseList.findPhraseGroup(group)
+	if phraseGroup == nil {
+		// Add this phrase group
+		phraseList.Groups = append(phraseList.Groups, PhraseGroup{GroupName: group})
+		phraseGroup = phraseList.findPhraseGroup(group)
+	}
+
+	include := phraseGroup.findInclude(fileInclude)
+	if include != "" {
+		log.Fatalf("File include '%s' already exists for phrase group '%s' in list '%s'\n", include, group, listName)
+		return -1
+	}
+
+	phraseGroup.Includes = append(phraseGroup.Includes, fileInclude)
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully added file include '%s' to list '%s'\n", fileInclude, listName)
+	return 0
+
+}
+
+/* Add an include to a phrase list */
+func DeleteInclude(listName string, group string, fileInclude string, targetName string) int {
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: \n", err)
+		return -1
+	}
+
+	phraseList := config.E2guardianConf.findPhraseList(listName)
+	if phraseList == nil {
+		log.Fatalf("Phrase list '%s' does not exist\n", listName)
+		return -1
+	}
+
+	phraseGroup := phraseList.findPhraseGroup(group)
+	if phraseGroup == nil {
+		// Add this phrase group
+		phraseList.Groups = append(phraseList.Groups, PhraseGroup{GroupName: group})
+		phraseGroup = phraseList.findPhraseGroup(group)
+	}
+
+	include := phraseGroup.findInclude(fileInclude)
+	if include == "" {
+		log.Fatalf("File include '%s' doesn't exist for phrase group '%s' in list '%s'\n", include, group, listName)
+		return -1
+	}
+
+	phraseGroup.Includes = phraseGroup.removeInclude(fileInclude)
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully deleted include '%s' from list '%s'\n", fileInclude, listName)
+	return 0
 
 }
 
