@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/e2guardian-angel/guardian-cli/utils"
@@ -39,9 +40,12 @@ var CLI struct {
 		Test struct {
 			Name string `arg:"" name:"name" help:"Name of target host to test"`
 		} `cmd:"" name:"test" help:"Run test ssh command"`
+		Select struct {
+			Name string `arg:"" name:"name" help:"Name of target host to select"`
+		} `cmd:"" name:"select" help:"Select target for operations"`
 	} `cmd:"" name:"target" help:"Operations on target hosts"`
 	Filter struct {
-		Target string `name:"target" help:"Name of target host for changes" required:"true"`
+		Target string `name:"target" help:"Name of target host for changes"`
 		Deploy struct {
 		} `cmd:"" name:"deploy" help:"Deploy filter stack to target host"`
 		Backup struct {
@@ -94,6 +98,18 @@ var CLI struct {
 func main() {
 	var code int = 0
 	ctx := kong.Parse(&CLI)
+
+	// Get the target if it is a filter command
+	target := CLI.Filter.Target
+	if strings.Contains(ctx.Command(), "filter") && target == "" {
+		var err error
+		err, target = utils.GetTargetSelection()
+		if err != nil {
+			log.Fatalf("For filter commands, you must either use the '--target' flag, or select a target using 'guardian-cli target select'\n")
+			os.Exit(-1)
+		}
+	}
+
 	switch ctx.Command() {
 	case "target add <name> <host> <username>":
 		code = utils.AddHost(CLI.Target.Add.Name, CLI.Target.Add.Host, CLI.Target.Add.Port, CLI.Target.Add.Username, CLI.Target.Add.NoPassword, CLI.Target.Add.HomePath)
@@ -115,22 +131,24 @@ func main() {
 		code = utils.ResetSsh()
 	case "target test <name>":
 		code = utils.TestSshCommand(CLI.Target.Test.Name)
+	case "target select <name>":
+		code = utils.SelectTargetHost(CLI.Target.Select.Name)
 	case "filter deploy":
-		code = utils.Deploy(CLI.Filter.Target)
+		code = utils.Deploy(target)
 	case "filter phrase-list add-list <name>":
-		code = utils.AddPhraseList(CLI.Filter.PhraseList.AddList.Name, CLI.Filter.Target)
+		code = utils.AddPhraseList(CLI.Filter.PhraseList.AddList.Name, target)
 	case "filter phrase-list remove-list <name>":
-		code = utils.DeletePhraseList(CLI.Filter.PhraseList.RemoveList.Name, CLI.Filter.Target)
+		code = utils.DeletePhraseList(CLI.Filter.PhraseList.RemoveList.Name, target)
 	case "filter phrase-list add-phrase <name> <phrase>":
-		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, CLI.Filter.PhraseList.AddPhrase.Phrase, CLI.Filter.PhraseList.AddPhrase.Group, CLI.Filter.Target, CLI.Filter.PhraseList.AddPhrase.Weight)
+		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, CLI.Filter.PhraseList.AddPhrase.Phrase, CLI.Filter.PhraseList.AddPhrase.Group, target, CLI.Filter.PhraseList.AddPhrase.Weight)
 	case "filter phrase-list remove-phrase <name> <phrase>":
-		code = utils.DeletePhraseFromList(CLI.Filter.PhraseList.RemovePhrase.Name, CLI.Filter.PhraseList.RemovePhrase.Phrase, CLI.Filter.PhraseList.RemovePhrase.Group, CLI.Filter.Target)
+		code = utils.DeletePhraseFromList(CLI.Filter.PhraseList.RemovePhrase.Name, CLI.Filter.PhraseList.RemovePhrase.Phrase, CLI.Filter.PhraseList.RemovePhrase.Group, target)
 	case "filter phrase-list add-include <name> <filename>":
-		code = utils.AddInclude(CLI.Filter.PhraseList.AddInclude.Name, CLI.Filter.PhraseList.AddInclude.Group, CLI.Filter.PhraseList.AddInclude.Filename, CLI.Filter.Target)
+		code = utils.AddInclude(CLI.Filter.PhraseList.AddInclude.Name, CLI.Filter.PhraseList.AddInclude.Group, CLI.Filter.PhraseList.AddInclude.Filename, target)
 	case "filter phrase-list remove-include <name> <filename>":
-		code = utils.DeleteInclude(CLI.Filter.PhraseList.DeleteInclude.Name, CLI.Filter.PhraseList.DeleteInclude.Group, CLI.Filter.PhraseList.DeleteInclude.Filename, CLI.Filter.Target)
+		code = utils.DeleteInclude(CLI.Filter.PhraseList.DeleteInclude.Name, CLI.Filter.PhraseList.DeleteInclude.Group, CLI.Filter.PhraseList.DeleteInclude.Filename, target)
 	case "filter phrase-list show":
-		code = utils.ShowPhraseList(CLI.Filter.PhraseList.Show.Name, CLI.Filter.Target, CLI.Filter.PhraseList.Show.Group)
+		code = utils.ShowPhraseList(CLI.Filter.PhraseList.Show.Name, target, CLI.Filter.PhraseList.Show.Group)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1
