@@ -665,43 +665,29 @@ func DeletePhraseFromList(listName string, phrase Phrase, group string, targetNa
 }
 
 /* Include a phrase list in one of the main lists */
-func AddInclude(listName string, fileInclude string, targetName string) int {
-
-	config, err := getHostFilterConfig(targetName)
-	if err != nil {
-		log.Fatal("Failed to get host config: \n", err)
-		return -1
-	}
-
-	phraseList := config.E2guardianConf.findPhraseList(listName)
-	if phraseList == nil {
-		if phraseList = config.E2guardianConf.findWeightedPhraseList(listName); phraseList == nil {
-			log.Fatalf("Phrase list '%s' does not exist", listName)
-			return -1
-		}
-	}
+func AddInclude(phraseList *PhraseList, config *FilterConfig, fileInclude string, targetName string) int {
 
 	include := phraseList.findInclude(fileInclude)
 	if include != "" {
-		log.Fatalf("Phrase list '%s' is already included in '%s'\n", listName, include)
+		log.Fatalf("Phrase list '%s' is already included in '%s'\n", phraseList.ListName, include)
 		return -1
 	}
 
 	phraseList.IncludeIn = append(phraseList.IncludeIn, fileInclude)
 
-	err = writeHostFilterConfig(targetName, config)
+	err := writeHostFilterConfig(targetName, *config)
 	if err != nil {
 		log.Fatal("Failed to write host config: ", err)
 		return -1
 	}
 
-	log.Printf("Successfully included phrase list '%s' in '%s'\n", listName, fileInclude)
+	log.Printf("Successfully included phrase list '%s' in '%s'\n", phraseList.ListName, fileInclude)
 	return 0
 
 }
 
-/* Remove phrase list include from one of the main lists */
-func DeleteInclude(listName string, fileInclude string, targetName string) int {
+/* Clear includes from phrase list */
+func DeleteIncludes(listName string, targetName string) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
@@ -717,13 +703,7 @@ func DeleteInclude(listName string, fileInclude string, targetName string) int {
 		}
 	}
 
-	include := phraseList.findInclude(fileInclude)
-	if include == "" {
-		log.Fatalf("Phrase list '%s' is not included in '%s'\n", listName, include)
-		return -1
-	}
-
-	phraseList.IncludeIn = phraseList.removeInclude(fileInclude)
+	phraseList.IncludeIn = phraseList.IncludeIn[:0]
 
 	err = writeHostFilterConfig(targetName, config)
 	if err != nil {
@@ -731,9 +711,54 @@ func DeleteInclude(listName string, fileInclude string, targetName string) int {
 		return -1
 	}
 
-	log.Printf("Successfully excluded phrase list '%s' from '%s'\n", listName, fileInclude)
+	log.Printf("Successfully cleared includes for phrase list '%s'\n", listName)
 	return 0
 
+}
+
+func Blacklist(listName string, targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: \n", err)
+		return -1
+	}
+
+	phraseList := config.E2guardianConf.findPhraseList(listName)
+	if phraseList == nil {
+		if phraseList = config.E2guardianConf.findWeightedPhraseList(listName); phraseList == nil {
+			log.Fatalf("Phrase list '%s' does not exist", listName)
+			return -1
+		}
+	}
+
+	if phraseList.Weighted {
+		return AddInclude(phraseList, &config, "weightedphraselist", targetName)
+	} else {
+		return AddInclude(phraseList, &config, "bannedphraselist", targetName)
+	}
+}
+
+func Whitelist(listName string, targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: \n", err)
+		return -1
+	}
+
+	phraseList := config.E2guardianConf.findPhraseList(listName)
+	if phraseList == nil {
+		if phraseList = config.E2guardianConf.findWeightedPhraseList(listName); phraseList == nil {
+			log.Fatalf("Phrase list '%s' does not exist", listName)
+			return -1
+		}
+	}
+
+	if phraseList.Weighted {
+		log.Fatalf("Whitelist not supported for weighted; just apply negative weight to your terms")
+		return -1
+	} else {
+		return AddInclude(phraseList, &config, "exceptionphraselist", targetName)
+	}
 }
 
 /* Dump a given phrase list, or list all of them */
