@@ -57,7 +57,7 @@ var CLI struct {
 		Uninstall struct {
 		} `cmd:"" name:"deploy" help:"Uninstall filter stack on target host"`
 		SafeSearch struct {
-			Force bool `arg:"" name:"force" help:"Safesearch is enforced" default:"false"`
+			Command string `arg:"" name:"command" help:"Safesearch is enforced (on/off/show)"`
 		} `cmd:"" name:"safe-search" help:"Safe search option"`
 		PhraseList struct {
 			AddPhrase struct {
@@ -82,7 +82,8 @@ var CLI struct {
 				Group    string `name:"group" help:"name of phrase group"`
 			} `cmd:"" name:"remove-include" help:"Include phraselist file to an existing list"`
 			AddList struct {
-				Name string `arg:"" name:"name" help:"Name of the phrase list to create"`
+				Name     string `arg:"" name:"name" help:"Name of the phrase list to create"`
+				Weighted bool   `name:"weighted" help:"phrase list is weighted" default:"false"`
 			} `cmd:"" name:"add-list" help:"Create a new phrase list"`
 			RemoveList struct {
 				Name string `arg:"" name:"name" help:"Name of the phrase list to delete"`
@@ -91,7 +92,9 @@ var CLI struct {
 				Name  string `name:"name" help:"Name of the phrase list to show"`
 				Group string `name:"group" help:"name of phrase group"`
 			} `cmd:"" name:"show" help:"Dump the contents of a phrase list"`
-		} `cmd:"" name:"phrase-list" help:"Backup target host's filter configuration"`
+		} `cmd:"" name:"phrase-list" help:"Configure phrase lists for content scanning"`
+		Acl struct {
+		} `cmd:"" name:"acl" help:"Configure acl lists for proxy"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
 }
 
@@ -136,19 +139,31 @@ func main() {
 	case "filter deploy":
 		code = utils.Deploy(target)
 	case "filter phrase-list add-list <name>":
-		code = utils.AddPhraseList(CLI.Filter.PhraseList.AddList.Name, target)
+		code = utils.AddPhraseList(CLI.Filter.PhraseList.AddList.Name, CLI.Filter.PhraseList.AddList.Weighted, target)
 	case "filter phrase-list remove-list <name>":
 		code = utils.DeletePhraseList(CLI.Filter.PhraseList.RemoveList.Name, target)
 	case "filter phrase-list add-phrase <name> <phrase>":
-		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, CLI.Filter.PhraseList.AddPhrase.Phrase, CLI.Filter.PhraseList.AddPhrase.Group, target, CLI.Filter.PhraseList.AddPhrase.Weight)
+		terms := strings.Split(CLI.Filter.PhraseList.AddPhrase.Phrase, ",")
+		phrase := utils.Phrase{
+			Phrase: terms,
+			Weight: CLI.Filter.PhraseList.AddPhrase.Weight,
+		}
+		code = utils.AddPhraseToList(CLI.Filter.PhraseList.AddPhrase.Name, phrase, CLI.Filter.PhraseList.AddPhrase.Group, target)
 	case "filter phrase-list remove-phrase <name> <phrase>":
-		code = utils.DeletePhraseFromList(CLI.Filter.PhraseList.RemovePhrase.Name, CLI.Filter.PhraseList.RemovePhrase.Phrase, CLI.Filter.PhraseList.RemovePhrase.Group, target)
+		terms := strings.Split(CLI.Filter.PhraseList.AddPhrase.Phrase, ",")
+		phrase := utils.Phrase{
+			Phrase: terms,
+			Weight: 0,
+		}
+		code = utils.DeletePhraseFromList(CLI.Filter.PhraseList.RemovePhrase.Name, phrase, CLI.Filter.PhraseList.RemovePhrase.Group, target)
 	case "filter phrase-list add-include <name> <filename>":
 		code = utils.AddInclude(CLI.Filter.PhraseList.AddInclude.Name, CLI.Filter.PhraseList.AddInclude.Group, CLI.Filter.PhraseList.AddInclude.Filename, target)
 	case "filter phrase-list remove-include <name> <filename>":
 		code = utils.DeleteInclude(CLI.Filter.PhraseList.DeleteInclude.Name, CLI.Filter.PhraseList.DeleteInclude.Group, CLI.Filter.PhraseList.DeleteInclude.Filename, target)
 	case "filter phrase-list show":
 		code = utils.ShowPhraseList(CLI.Filter.PhraseList.Show.Name, target, CLI.Filter.PhraseList.Show.Group)
+	case "filter safe-search <command>":
+		code = utils.SafeSearch(CLI.Filter.SafeSearch.Command, target)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1

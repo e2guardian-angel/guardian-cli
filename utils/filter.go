@@ -11,7 +11,6 @@ import (
 	"path"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -20,10 +19,15 @@ import (
 
 const helmChartGit = "https://github.com/e2guardian-angel/guardian-helm.git"
 
+type Phrase struct {
+	Phrase []string `yaml:"phrase"`
+	Weight int      `yaml:"weight"`
+}
+
 type PhraseGroup struct {
-	GroupName string     `yaml:"groupName"`
-	Phrases   [][]string `yaml:"phrases"`
-	Includes  []string   `yaml:"includes"`
+	GroupName string   `yaml:"groupName"`
+	Phrases   []Phrase `yaml:"phrases"`
+	Includes  []string `yaml:"includes"`
 }
 
 type SiteGroup struct {
@@ -49,6 +53,7 @@ type ExtensionGroup struct {
 type PhraseList struct {
 	ListName string        `yaml:"listName"`
 	Groups   []PhraseGroup `yaml:"groups"`
+	Weighted bool
 }
 
 type SiteLists struct {
@@ -82,11 +87,12 @@ type DecryptRule struct {
 }
 
 type E2guardianConfig struct {
-	PhraseLists     []PhraseList     `yaml:"phraseLists"`
-	SiteLists       []SiteGroup      `yaml:"siteLists"`
-	Regexpurlists   []RegexGroup     `yaml:"regexpurllists"`
-	Mimetypelists   []TypeGroup      `yaml:"mimetypelists"`
-	Extensionslists []ExtensionGroup `yaml:"extensionslists"`
+	PhraseLists         []PhraseList     `yaml:"phraseLists"`
+	WeightedPhraseLists []PhraseList     `yaml:"weightedPhraseLists"`
+	SiteLists           []SiteGroup      `yaml:"siteLists"`
+	Regexpurlists       []RegexGroup     `yaml:"regexpurllists"`
+	Mimetypelists       []TypeGroup      `yaml:"mimetypelists"`
+	Extensionslists     []ExtensionGroup `yaml:"extensionslists"`
 }
 
 type TlsSecret struct {
@@ -390,6 +396,16 @@ func (config *E2guardianConfig) findPhraseList(listName string) *PhraseList {
 	return nil
 }
 
+func (config *E2guardianConfig) findWeightedPhraseList(listName string) *PhraseList {
+	for i := range config.WeightedPhraseLists {
+		list := &config.WeightedPhraseLists[i]
+		if list.ListName == listName {
+			return list
+		}
+	}
+	return nil
+}
+
 func (list *PhraseList) findPhraseGroup(groupName string) *PhraseGroup {
 	for i := range list.Groups {
 		group := &list.Groups[i]
@@ -400,14 +416,36 @@ func (list *PhraseList) findPhraseGroup(groupName string) *PhraseGroup {
 	return nil
 }
 
-func phrasesMatch(a, b []string) bool {
-	if len(a) != len(b) {
+func (config *E2guardianConfig) deletePhraseList(listName string) bool {
+	// First try the phrase lists
+	for i := range config.PhraseLists {
+		if config.PhraseLists[i].ListName == listName {
+			config.PhraseLists = append(
+				config.PhraseLists[:i],
+				config.PhraseLists[i+1:]...)
+			return true
+		}
+	}
+	// Now try the weighted ones
+	for i := range config.WeightedPhraseLists {
+		if config.WeightedPhraseLists[i].ListName == listName {
+			config.WeightedPhraseLists = append(
+				config.WeightedPhraseLists[:i],
+				config.WeightedPhraseLists[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func phrasesMatch(a, b Phrase) bool {
+	if len(a.Phrase) != len(b.Phrase) {
 		return false
 	} else {
-		sort.Strings(a)
-		sort.Strings(b)
-		for i, term := range a {
-			if b[i] != term {
+		sort.Strings(a.Phrase)
+		sort.Strings(b.Phrase)
+		for i, term := range a.Phrase {
+			if b.Phrase[i] != term {
 				return false
 			}
 		}
@@ -415,7 +453,7 @@ func phrasesMatch(a, b []string) bool {
 	}
 }
 
-func (group *PhraseGroup) findPhrase(phrase []string) *[]string {
+func (group *PhraseGroup) findPhrase(phrase Phrase) *Phrase {
 	for _, currentPhrase := range group.Phrases {
 		if phrasesMatch(currentPhrase, phrase) {
 			return &currentPhrase
@@ -424,7 +462,7 @@ func (group *PhraseGroup) findPhrase(phrase []string) *[]string {
 	return nil
 }
 
-func (group *PhraseGroup) removePhrase(phrase []string) [][]string {
+func (group *PhraseGroup) removePhrase(phrase Phrase) []Phrase {
 	for i, currentPhrase := range group.Phrases {
 		if phrasesMatch(currentPhrase, phrase) {
 			group.Phrases = append(group.Phrases[:i], group.Phrases[i+1:]...)
@@ -455,7 +493,7 @@ func (group *PhraseGroup) removeInclude(fileName string) []string {
  * CLI methods
  */
 /* Add a new phrase list */
-func AddPhraseList(listName string, targetName string) int {
+func AddPhraseList(listName string, weighted bool, targetName string) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
@@ -463,13 +501,22 @@ func AddPhraseList(listName string, targetName string) int {
 		return -1
 	}
 
-	phraseList := config.E2guardianConf.findPhraseList(listName)
+	var phraseList *PhraseList
+	if weighted {
+		phraseList = config.E2guardianConf.findWeightedPhraseList(listName)
+	} else {
+		phraseList = config.E2guardianConf.findPhraseList(listName)
+	}
 	if phraseList != nil {
 		log.Fatalf("Phrase list '%s' already exists", listName)
 		return -1
 	}
 
-	config.E2guardianConf.PhraseLists = append(config.E2guardianConf.PhraseLists, PhraseList{ListName: listName})
+	if weighted {
+		config.E2guardianConf.WeightedPhraseLists = append(config.E2guardianConf.WeightedPhraseLists, PhraseList{ListName: listName, Weighted: true})
+	} else {
+		config.E2guardianConf.PhraseLists = append(config.E2guardianConf.PhraseLists, PhraseList{ListName: listName, Weighted: false})
+	}
 
 	err = writeHostFilterConfig(targetName, config)
 	if err != nil {
@@ -491,29 +538,26 @@ func DeletePhraseList(listName string, targetName string) int {
 		return -1
 	}
 
-	for i := range config.E2guardianConf.PhraseLists {
-		if config.E2guardianConf.PhraseLists[i].ListName == listName {
-			config.E2guardianConf.PhraseLists = append(
-				config.E2guardianConf.PhraseLists[:i],
-				config.E2guardianConf.PhraseLists[i+1:]...)
-			log.Printf("Successfully deleted list %s", listName)
-			err = writeHostFilterConfig(targetName, config)
-			if err != nil {
-				log.Fatal("Failed to write host config: ", err)
-				return -1
-			}
-			return 0
-		}
-	}
+	deleted := config.E2guardianConf.deletePhraseList(listName)
 
 	// If we are here, then the phrase list doesn't exist
-	log.Fatalf("Phrase list '%s' doesn't exist\n", listName)
-	return -1
+	if deleted {
+		log.Printf("Successfully deleted phrase list '%s' from config for target '%s'", listName, targetName)
+		err = writeHostFilterConfig(targetName, config)
+		if err != nil {
+			log.Fatal("Failed to write host config: ", err)
+			return -1
+		}
+		return 0
+	} else {
+		log.Fatalf("Phrase list '%s' doesn't exist\n", listName)
+		return -1
+	}
 
 }
 
 /* Add phrase to existing list */
-func AddPhraseToList(listName string, phrase string, group string, targetName string, weight int) int {
+func AddPhraseToList(listName string, phrase Phrase, group string, targetName string) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
@@ -521,9 +565,19 @@ func AddPhraseToList(listName string, phrase string, group string, targetName st
 		return -1
 	}
 
-	phraseList := config.E2guardianConf.findPhraseList(listName)
+	var phraseList *PhraseList
+
+	if phrase.Weight > 0 {
+		phraseList = config.E2guardianConf.findWeightedPhraseList(listName)
+	} else {
+		phraseList = config.E2guardianConf.findPhraseList(listName)
+	}
 	if phraseList == nil {
-		log.Fatalf("Phrase list '%s' does not exist", listName)
+		phraseStr := "Phrase list"
+		if phrase.Weight > 0 {
+			phraseStr = "Weighted phrase list"
+		}
+		log.Fatalf("%s '%s' does not exist", phraseStr, listName)
 		return -1
 	}
 
@@ -534,23 +588,23 @@ func AddPhraseToList(listName string, phrase string, group string, targetName st
 		phraseGroup = phraseList.findPhraseGroup(group)
 	}
 
-	terms := strings.Split(phrase, ",")
-	existingPhrase := phraseGroup.findPhrase(terms)
+	existingPhrase := phraseGroup.findPhrase(phrase)
 	if existingPhrase != nil {
 		// no name group displayed as 'default'
 		groupName := "default"
 		if group != "" {
 			groupName = group
 		}
-		log.Fatalf("Phrase '%s' already exists in group '%s' of phrase list '%s'", phrase, groupName, listName)
-		return -1
+		if phrase.Weight > 0 {
+			log.Printf("Weighted phrase '%s' already exists in group '%s' of weighted phrase list '%s'; updating weight to %d", phrase, groupName, listName, phrase.Weight)
+			phraseGroup.Phrases = phraseGroup.removePhrase(phrase)
+		} else {
+			log.Fatalf("Phrase '%s' already exists in group '%s' of phrase list '%s'", phrase, groupName, listName)
+			return -1
+		}
 	}
 
-	// TODO: format terms for e2guardian
-	if weight != 0 {
-		terms = append(terms, strconv.Itoa(weight))
-	}
-	phraseGroup.Phrases = append(phraseGroup.Phrases, terms)
+	phraseGroup.Phrases = append(phraseGroup.Phrases, phrase)
 
 	err = writeHostFilterConfig(targetName, config)
 	if err != nil {
@@ -564,7 +618,7 @@ func AddPhraseToList(listName string, phrase string, group string, targetName st
 }
 
 /* Add phrase to existing list */
-func DeletePhraseFromList(listName string, phrase string, group string, targetName string) int {
+func DeletePhraseFromList(listName string, phrase Phrase, group string, targetName string) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
@@ -574,8 +628,10 @@ func DeletePhraseFromList(listName string, phrase string, group string, targetNa
 
 	phraseList := config.E2guardianConf.findPhraseList(listName)
 	if phraseList == nil {
-		log.Fatalf("Phrase list '%s' does not exist", listName)
-		return -1
+		if phraseList = config.E2guardianConf.findWeightedPhraseList(listName); phraseList == nil {
+			log.Fatalf("Phrase list '%s' does not exist", listName)
+			return -1
+		}
 	}
 
 	phraseGroup := phraseList.findPhraseGroup(group)
@@ -585,8 +641,7 @@ func DeletePhraseFromList(listName string, phrase string, group string, targetNa
 		phraseGroup = phraseList.findPhraseGroup(group)
 	}
 
-	terms := strings.Split(phrase, ",")
-	existingPhrase := phraseGroup.findPhrase(terms)
+	existingPhrase := phraseGroup.findPhrase(phrase)
 	if existingPhrase == nil {
 		// no name group displayed as 'default'
 		groupName := "default"
@@ -597,7 +652,7 @@ func DeletePhraseFromList(listName string, phrase string, group string, targetNa
 		return -1
 	} else {
 		// Delete it here
-		phraseGroup.Phrases = phraseGroup.removePhrase(terms)
+		phraseGroup.Phrases = phraseGroup.removePhrase(phrase)
 		err = writeHostFilterConfig(targetName, config)
 		if err != nil {
 			log.Fatal("Failed to write host config: ", err)
@@ -620,8 +675,10 @@ func AddInclude(listName string, group string, fileInclude string, targetName st
 
 	phraseList := config.E2guardianConf.findPhraseList(listName)
 	if phraseList == nil {
-		log.Fatalf("Phrase list '%s' does not exist\n", listName)
-		return -1
+		if phraseList = config.E2guardianConf.findWeightedPhraseList(listName); phraseList == nil {
+			log.Fatalf("Phrase list '%s' does not exist", listName)
+			return -1
+		}
 	}
 
 	phraseGroup := phraseList.findPhraseGroup(group)
@@ -661,8 +718,10 @@ func DeleteInclude(listName string, group string, fileInclude string, targetName
 
 	phraseList := config.E2guardianConf.findPhraseList(listName)
 	if phraseList == nil {
-		log.Fatalf("Phrase list '%s' does not exist\n", listName)
-		return -1
+		if phraseList = config.E2guardianConf.findWeightedPhraseList(listName); phraseList == nil {
+			log.Fatalf("Phrase list '%s' does not exist", listName)
+			return -1
+		}
 	}
 
 	phraseGroup := phraseList.findPhraseGroup(group)
@@ -706,13 +765,19 @@ func ShowPhraseList(listName string, targetName string, group string) int {
 		for i := range config.E2guardianConf.PhraseLists {
 			log.Println(config.E2guardianConf.PhraseLists[i].ListName)
 		}
+		log.Println("=== WEIGHTED PHRASE LISTS ===")
+		for i := range config.E2guardianConf.WeightedPhraseLists {
+			log.Println(config.E2guardianConf.WeightedPhraseLists[i].ListName)
+		}
 		return -1
 	}
 
 	phraseList := config.E2guardianConf.findPhraseList(listName)
 	if phraseList == nil {
-		log.Fatalf("Phrase list '%s' does not exist for target '%s", listName, targetName)
-		return -1
+		if phraseList = config.E2guardianConf.findWeightedPhraseList(listName); phraseList == nil {
+			log.Fatalf("Phrase list '%s' does not exist", listName)
+			return -1
+		}
 	}
 
 	var groups []PhraseGroup
@@ -741,17 +806,51 @@ func ShowPhraseList(listName string, targetName string, group string) int {
 		for j := range group.Phrases {
 			phrase := group.Phrases[j]
 			phraseString := ""
-			for k := range phrase {
-				term := phrase[k]
-				weight, err := strconv.Atoi(term)
-				if k == len(phrase)-1 && err == nil {
-					phraseString = fmt.Sprintf("%s (weight=%d)", phraseString, weight)
-				} else {
-					phraseString = fmt.Sprintf("%s<%s>", phraseString, term)
-				}
+			for k := range phrase.Phrase {
+				term := phrase.Phrase[k]
+				phraseString = fmt.Sprintf("%s<%s>", phraseString, term)
+			}
+			if phraseList.Weighted {
+				phraseString = fmt.Sprintf("%s (weight=%d)", phraseString, phrase.Weight)
 			}
 			log.Println(phraseString)
 		}
+	}
+
+	return 0
+}
+
+func SafeSearch(enforced string, targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	switch enforced {
+	case "show":
+		current := config.SafeSearchEnforced
+		if current {
+			fmt.Println("Safesearch is enforced")
+		} else {
+			fmt.Println("Safesearch is not enforced")
+		}
+		return 0
+	case "on":
+		config.SafeSearchEnforced = true
+		fmt.Println("SafeSearch has been enabled")
+	case "off":
+		config.SafeSearchEnforced = false
+		fmt.Println("SafeSearch has been disabled")
+	default:
+		log.Fatalf("Unknown directive: '%s'", enforced)
+		return -1
+	}
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
 	}
 
 	return 0
