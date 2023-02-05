@@ -67,20 +67,20 @@ var CLI struct {
 				Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
 			} `cmd:"" name:"add-phrase" help:"Add a phrase to an existing list"`
 			AddInclude struct {
-				Name     string `arg:"" name:"name" help:"Name of the phrase list to modify" required:"true"`
-				Filename string `arg:"" name:"filename" help:"Name of the phrase list file to include" required:"true"`
+				Name     string `arg:"" name:"name" help:"Name of the phrase list to be included" required:"true"`
+				MainList string `arg:"" name:"filename" help:"Name of the main list to add include" required:"true"`
 				Group    string `name:"group" help:"name of phrase group"`
-			} `cmd:"" name:"add-include" help:"Include phraselist file to an existing list"`
+			} `cmd:"" name:"add-include" help:"Include phraselist to one of the existing lists"`
 			RemovePhrase struct {
 				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
 				Phrase string `arg:"" name:"phrase" help:"Name of phrase list file include to delete" type:"comma separated list"`
 				Group  string `name:"group" help:"name of phrase group"`
-			} `cmd:"" name:"remove-phrase" help:"Remove an include from an existing list"`
+			} `cmd:"" name:"remove-phrase" help:"Remove a phrase from an existing list"`
 			DeleteInclude struct {
-				Name     string `arg:"" name:"name" help:"Name of the phrase list" required:"true"`
-				Filename string `arg:"" name:"filename" help:"Name of the phrase list to modify" required:"true"`
+				Name     string `arg:"" name:"name" help:"Name of the phrase list to be excluded" required:"true"`
+				MainList string `arg:"" name:"filename" help:"Name of main list to delete include from" required:"true"`
 				Group    string `name:"group" help:"name of phrase group"`
-			} `cmd:"" name:"remove-include" help:"Include phraselist file to an existing list"`
+			} `cmd:"" name:"remove-include" help:"Delete an include from a list"`
 			AddList struct {
 				Name     string `arg:"" name:"name" help:"Name of the phrase list to create"`
 				Weighted bool   `name:"weighted" help:"phrase list is weighted" default:"false"`
@@ -157,9 +157,9 @@ func main() {
 		}
 		code = utils.DeletePhraseFromList(CLI.Filter.PhraseList.RemovePhrase.Name, phrase, CLI.Filter.PhraseList.RemovePhrase.Group, target)
 	case "filter phrase-list add-include <name> <filename>":
-		code = utils.AddInclude(CLI.Filter.PhraseList.AddInclude.Name, CLI.Filter.PhraseList.AddInclude.Group, CLI.Filter.PhraseList.AddInclude.Filename, target)
+		code = utils.AddInclude(CLI.Filter.PhraseList.AddInclude.Name, CLI.Filter.PhraseList.AddInclude.MainList, target)
 	case "filter phrase-list remove-include <name> <filename>":
-		code = utils.DeleteInclude(CLI.Filter.PhraseList.DeleteInclude.Name, CLI.Filter.PhraseList.DeleteInclude.Group, CLI.Filter.PhraseList.DeleteInclude.Filename, target)
+		code = utils.DeleteInclude(CLI.Filter.PhraseList.DeleteInclude.Name, CLI.Filter.PhraseList.DeleteInclude.MainList, target)
 	case "filter phrase-list show":
 		code = utils.ShowPhraseList(CLI.Filter.PhraseList.Show.Name, target, CLI.Filter.PhraseList.Show.Group)
 	case "filter safe-search <command>":

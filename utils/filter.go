@@ -27,7 +27,6 @@ type Phrase struct {
 type PhraseGroup struct {
 	GroupName string   `yaml:"groupName"`
 	Phrases   []Phrase `yaml:"phrases"`
-	Includes  []string `yaml:"includes"`
 }
 
 type SiteGroup struct {
@@ -51,9 +50,10 @@ type ExtensionGroup struct {
 }
 
 type PhraseList struct {
-	ListName string        `yaml:"listName"`
-	Groups   []PhraseGroup `yaml:"groups"`
-	Weighted bool
+	ListName  string        `yaml:"listName"`
+	IncludeIn []string      `yaml:"includeIn"`
+	Groups    []PhraseGroup `yaml:"groups"`
+	Weighted  bool
 }
 
 type SiteLists struct {
@@ -115,7 +115,7 @@ type FilterConfig struct {
 	DecryptHTTPS    bool             `yaml:"decryptHTTPS"`
 	AllowRules      []AllowRule      `yaml:"allowRules"`
 	DecryptRules    []DecryptRule    `yaml:"decryptRules"`
-	E2guardianConf  E2guardianConfig `yaml:"e2guardianConfig"`
+	E2guardianConf  E2guardianConfig `yaml:"e2guardianConf"`
 	CacheTTL        int              `yaml:"cacheTTL"`
 	MaxKeys         int              `yaml:"maxKeys"`
 	FilterReplicas  int              `yaml:"filterReplicas"`
@@ -471,8 +471,8 @@ func (group *PhraseGroup) removePhrase(phrase Phrase) []Phrase {
 	return group.Phrases
 }
 
-func (group *PhraseGroup) findInclude(fileName string) string {
-	for _, fname := range group.Includes {
+func (list *PhraseList) findInclude(fileName string) string {
+	for _, fname := range list.IncludeIn {
 		if fname == fileName {
 			return fname
 		}
@@ -480,13 +480,13 @@ func (group *PhraseGroup) findInclude(fileName string) string {
 	return ""
 }
 
-func (group *PhraseGroup) removeInclude(fileName string) []string {
-	for i, fname := range group.Includes {
+func (list *PhraseList) removeInclude(fileName string) []string {
+	for i, fname := range list.IncludeIn {
 		if fname == fileName {
-			group.Includes = append(group.Includes[:i], group.Includes[i+1:]...)
+			list.IncludeIn = append(list.IncludeIn[:i], list.IncludeIn[i+1:]...)
 		}
 	}
-	return group.Includes
+	return list.IncludeIn
 }
 
 /*
@@ -664,8 +664,8 @@ func DeletePhraseFromList(listName string, phrase Phrase, group string, targetNa
 
 }
 
-/* Add an include to a phrase list */
-func AddInclude(listName string, group string, fileInclude string, targetName string) int {
+/* Include a phrase list in one of the main lists */
+func AddInclude(listName string, fileInclude string, targetName string) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
@@ -681,20 +681,13 @@ func AddInclude(listName string, group string, fileInclude string, targetName st
 		}
 	}
 
-	phraseGroup := phraseList.findPhraseGroup(group)
-	if phraseGroup == nil {
-		// Add this phrase group
-		phraseList.Groups = append(phraseList.Groups, PhraseGroup{GroupName: group})
-		phraseGroup = phraseList.findPhraseGroup(group)
-	}
-
-	include := phraseGroup.findInclude(fileInclude)
+	include := phraseList.findInclude(fileInclude)
 	if include != "" {
-		log.Fatalf("File include '%s' already exists for phrase group '%s' in list '%s'\n", include, group, listName)
+		log.Fatalf("Phrase list '%s' is already included in '%s'\n", listName, include)
 		return -1
 	}
 
-	phraseGroup.Includes = append(phraseGroup.Includes, fileInclude)
+	phraseList.IncludeIn = append(phraseList.IncludeIn, fileInclude)
 
 	err = writeHostFilterConfig(targetName, config)
 	if err != nil {
@@ -702,13 +695,13 @@ func AddInclude(listName string, group string, fileInclude string, targetName st
 		return -1
 	}
 
-	log.Printf("Successfully added file include '%s' to list '%s'\n", fileInclude, listName)
+	log.Printf("Successfully included phrase list '%s' in '%s'\n", listName, fileInclude)
 	return 0
 
 }
 
-/* Add an include to a phrase list */
-func DeleteInclude(listName string, group string, fileInclude string, targetName string) int {
+/* Remove phrase list include from one of the main lists */
+func DeleteInclude(listName string, fileInclude string, targetName string) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
@@ -724,20 +717,13 @@ func DeleteInclude(listName string, group string, fileInclude string, targetName
 		}
 	}
 
-	phraseGroup := phraseList.findPhraseGroup(group)
-	if phraseGroup == nil {
-		// Add this phrase group
-		phraseList.Groups = append(phraseList.Groups, PhraseGroup{GroupName: group})
-		phraseGroup = phraseList.findPhraseGroup(group)
-	}
-
-	include := phraseGroup.findInclude(fileInclude)
+	include := phraseList.findInclude(fileInclude)
 	if include == "" {
-		log.Fatalf("File include '%s' doesn't exist for phrase group '%s' in list '%s'\n", include, group, listName)
+		log.Fatalf("Phrase list '%s' is not included in '%s'\n", listName, include)
 		return -1
 	}
 
-	phraseGroup.Includes = phraseGroup.removeInclude(fileInclude)
+	phraseList.IncludeIn = phraseList.removeInclude(fileInclude)
 
 	err = writeHostFilterConfig(targetName, config)
 	if err != nil {
@@ -745,7 +731,7 @@ func DeleteInclude(listName string, group string, fileInclude string, targetName
 		return -1
 	}
 
-	log.Printf("Successfully deleted include '%s' from list '%s'\n", fileInclude, listName)
+	log.Printf("Successfully excluded phrase list '%s' from '%s'\n", listName, fileInclude)
 	return 0
 
 }
@@ -793,15 +779,18 @@ func ShowPhraseList(listName string, targetName string, group string) int {
 		groups = phraseList.Groups
 	}
 
+	// Dump includes
+	log.Printf("=== INCLUDES ===")
+	for _, inc := range phraseList.IncludeIn {
+		log.Println(inc)
+	}
+
 	for i := range groups {
 		group := groups[i]
 		log.Printf("Group: %s", group.GroupName)
-		log.Printf("=== INCLUDES ===")
+
 		// Dump includes
-		for j := range group.Includes {
-			include := group.Includes[j]
-			log.Println(include)
-		}
+
 		log.Printf("=== PHRASES ===")
 		for j := range group.Phrases {
 			phrase := group.Phrases[j]
