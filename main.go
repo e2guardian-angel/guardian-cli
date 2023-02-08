@@ -214,6 +214,12 @@ func main() {
 		code = utils.AddEntryToContentList(CLI.Filter.ContentList.AddEntry.Name, CLI.Filter.ContentList.AddEntry.Group, CLI.Filter.ContentList.AddEntry.Entry, target)
 	case "filter content-list remove-entry <name> <entry>":
 		code = utils.DeleteEntryFromList(CLI.Filter.ContentList.RemoveEntry.Name, CLI.Filter.ContentList.RemoveEntry.Entry, CLI.Filter.ContentList.RemoveEntry.Group, target)
+	case "filter content-list blacklist <name>":
+		code = utils.Blacklist(CLI.Filter.ContentList.Blacklist.Name, target)
+	case "filter content-list whitelist <name>":
+		code = utils.Whitelist(CLI.Filter.ContentList.Whitelist.Name, target)
+	case "filter content-list clear <name>":
+		code = utils.DeleteIncludes(CLI.Filter.ContentList.Clear.Name, target)
 	case "filter safe-search <command>":
 		code = utils.SafeSearch(CLI.Filter.SafeSearch.Command, target)
 	case "filter content-list show":
