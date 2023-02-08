@@ -55,7 +55,7 @@ type AllowRule struct {
 
 type DecryptRule struct {
 	Category string `yaml:"category"`
-	Decrypt  bool   `yaml:"allow"`
+	Decrypt  bool   `yaml:"decrypt"`
 }
 
 type E2guardianConfig struct {
@@ -103,6 +103,7 @@ type FilterConfig struct {
 }
 
 var ListTypes = []string{"sitelist", "regexpurllist", "mimetypelist", "extensionslist"}
+var AclActions = []string{"allow", "deny", "decrypt", "nodecrypt"}
 
 var banLists = map[string]string{
 	"sitelist":       "bannedsitelist",
@@ -455,6 +456,76 @@ func (config *E2guardianConfig) deleteContentList(listName string) bool {
 	return false
 }
 
+func (config *FilterConfig) AclRuleExists(category string, action string) bool {
+	if action == "allow" || action == "deny" {
+		allow := (action == "allow")
+		for _, rule := range config.AllowRules {
+			if rule.Allow == allow && rule.Category == category {
+				return true
+			}
+		}
+	} else if action == "decrypt" || action == "nodecrypt" {
+		decrypt := (action == "decrypt")
+		for _, rule := range config.DecryptRules {
+			if rule.Category == category && rule.Decrypt == decrypt {
+				return true
+			}
+		}
+	}
+	// Rule does not exist, or action string is wrong
+	return false
+}
+
+func (config *FilterConfig) AddAclRule(category string, action string, pos int) {
+	if action == "allow" || action == "deny" {
+		allow := (action == "allow")
+		i := pos
+		if pos < 0 || pos > len(config.AllowRules) {
+			i = len(config.AllowRules)
+		}
+		after := append([]AllowRule{AllowRule{Category: category, Allow: allow}}, config.AllowRules[i:]...)
+		config.AllowRules = append(config.AllowRules[:i], after...)
+	} else {
+		decrypt := (action == "decrypt")
+		i := pos
+		if pos < 0 || pos > len(config.DecryptRules) {
+			i = len(config.DecryptRules)
+		}
+		before := append(config.DecryptRules[:i], DecryptRule{Category: category, Decrypt: decrypt})
+		after := config.DecryptRules[i+1:]
+		config.DecryptRules = append(before, after...)
+	}
+}
+
+func (config *FilterConfig) DeleteAllowRule(category string, action string) []AllowRule {
+	allow := (action == "allow")
+	for i, rule := range config.AllowRules {
+		if category == rule.Category && allow == rule.Allow {
+			return append(config.AllowRules[:i], config.AllowRules[i+1:]...)
+		}
+	}
+	return config.AllowRules
+}
+
+func (config *FilterConfig) DeleteDecryptRule(category string, action string) []DecryptRule {
+	decrypt := (action == "decrypt")
+	for i, rule := range config.DecryptRules {
+		if category == rule.Category && decrypt == rule.Decrypt {
+			return append(config.DecryptRules[:i], config.DecryptRules[i+1:]...)
+		}
+	}
+	return config.DecryptRules
+}
+
+func (config *FilterConfig) shouldDecrypt() bool {
+	for _, rule := range config.DecryptRules {
+		if rule.Decrypt == true {
+			return true
+		}
+	}
+	return false
+}
+
 func phrasesMatch(a, b Phrase) bool {
 	if len(a.Phrase) != len(b.Phrase) {
 		return false
@@ -667,10 +738,10 @@ func AddPhraseToList(listName string, phrase Phrase, group string, targetName st
 			groupName = group
 		}
 		if phrase.Weight > 0 {
-			log.Printf("Weighted phrase '%s' already exists in group '%s' of weighted phrase list '%s'; updating weight to %d", phrase, groupName, listName, phrase.Weight)
+			log.Printf("Weighted phrase '%s' already exists in group '%s' of weighted phrase list '%s'; updating weight to %d", phrase.Phrase, groupName, listName, phrase.Weight)
 			phraseGroup.Phrases = phraseGroup.removePhrase(phrase)
 		} else {
-			log.Fatalf("Phrase '%s' already exists in group '%s' of phrase list '%s'", phrase, groupName, listName)
+			log.Fatalf("Phrase '%s' already exists in group '%s' of phrase list '%s'", phrase.Phrase, groupName, listName)
 			return -1
 		}
 	}
@@ -719,7 +790,7 @@ func DeletePhraseFromList(listName string, phrase Phrase, group string, targetNa
 		if group != "" {
 			groupName = group
 		}
-		log.Fatalf("Phrase '%s' doesn't exist in group '%s' of phrase list '%s'", phrase, groupName, listName)
+		log.Fatalf("Phrase '%s' doesn't exist in group '%s' of phrase list '%s'", phrase.Phrase, groupName, listName)
 		return -1
 	} else {
 		// Delete it here
@@ -1163,6 +1234,115 @@ func ShowContentList(listName string, targetName string, group string) int {
 			item := group.Items[j]
 			log.Println(item)
 		}
+	}
+
+	return 0
+}
+
+func validAction(action string) bool {
+	for _, a := range AclActions {
+		if a == action {
+			return true
+		}
+	}
+	return false
+}
+
+func AddAclRule(category string, action string, targetName string, pos int) int {
+
+	if !validAction(action) {
+		log.Fatalf("Invalid action '%s', valid options are %s\n", action, strings.Join(AclActions, ", "))
+		return -1
+	}
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	if config.AclRuleExists(category, action) {
+		log.Fatalf("Acl rule '%s=%s' already exists\n", category, action)
+		return -1
+	}
+
+	config.AddAclRule(category, action, pos)
+
+	// Set DecryptHTTPS if applicable
+	config.DecryptHTTPS = config.shouldDecrypt()
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully added acl rule '%s=%s'\n", category, action)
+
+	return 0
+}
+
+func DeleteAclRule(category string, action string, targetName string) int {
+
+	if !validAction(action) {
+		log.Fatalf("Invalid action '%s', valid options are %s\n", action, strings.Join(AclActions, ", "))
+		return -1
+	}
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	if !config.AclRuleExists(category, action) {
+		log.Fatalf("Acl rule '%s=%s' doesn't exist\n", category, action)
+		return -1
+	}
+
+	if action == "allow" || action == "deny" {
+		config.AllowRules = config.DeleteAllowRule(category, action)
+	} else {
+		config.DecryptRules = config.DeleteDecryptRule(category, action)
+	}
+
+	// Set DecryptHTTPS if applicable
+	config.DecryptHTTPS = config.shouldDecrypt()
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully deleted acl rule '%s=%s'\n", category, action)
+
+	return 0
+}
+
+func ShowAclRules(targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	log.Printf("=== DECRYPT RULES ===")
+	for _, rule := range config.DecryptRules {
+		action := "decrypt"
+		if !rule.Decrypt {
+			action = "nodecrypt"
+		}
+		log.Printf("Category: '%s', Action: '%s'\n", rule.Category, action)
+	}
+
+	log.Printf("=== ALLOW RULES ===")
+	for _, rule := range config.AllowRules {
+		action := "allow"
+		if !rule.Allow {
+			action = "deny"
+		}
+		log.Printf("Category: '%s', Action: '%s'", rule.Category, action)
 	}
 
 	return 0

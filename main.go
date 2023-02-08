@@ -125,6 +125,18 @@ var CLI struct {
 			} `cmd:"" name:"show" help:"Dump the contents of a content list"`
 		} `cmd:"" name:"content-list" help:"Configure content lists for content scanning"`
 		Acl struct {
+			AddRule struct {
+				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
+				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
+				Position int    `name:"position" help:"Position of rule in ordered acl list" default:-1`
+			} `cmd:"" name:"add" help:"Adds an ACL rule"`
+			DeleteRule struct {
+				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
+				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
+				Position int    `name:"position" help:"Position of rule in ordered acl list" default:-1`
+			} `cmd:"" name:"delete" help:"Deletes an ACL rule"`
+			Show struct {
+			} `cmd:"" name:"show" help:"Show all acl rules"`
 		} `cmd:"" name:"acl" help:"Configure acl lists for proxy"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
 }
@@ -224,6 +236,12 @@ func main() {
 		code = utils.SafeSearch(CLI.Filter.SafeSearch.Command, target)
 	case "filter content-list show":
 		code = utils.ShowContentList(CLI.Filter.ContentList.Show.Name, target, CLI.Filter.ContentList.Show.Group)
+	case "filter acl add <category> <action>":
+		code = utils.AddAclRule(CLI.Filter.Acl.AddRule.Category, CLI.Filter.Acl.AddRule.Action, target, CLI.Filter.Acl.AddRule.Position)
+	case "filter acl delete <category> <action>":
+		code = utils.DeleteAclRule(CLI.Filter.Acl.DeleteRule.Category, CLI.Filter.Acl.DeleteRule.Action, target)
+	case "filter acl show":
+		code = utils.ShowAclRules(target)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1
