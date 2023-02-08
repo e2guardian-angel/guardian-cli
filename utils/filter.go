@@ -29,26 +29,6 @@ type PhraseGroup struct {
 	Phrases   []Phrase `yaml:"phrases"`
 }
 
-type SiteGroup struct {
-	GroupName string   `yaml:"groupName"`
-	Sites     []string `yaml:"sites"`
-}
-
-type RegexGroup struct {
-	GroupName string   `yaml:"groupName"`
-	Patterns  []string `yaml:"patterns"`
-}
-
-type TypeGroup struct {
-	GroupName string   `yaml:"groupName"`
-	Types     []string `yaml:"types"`
-}
-
-type ExtensionGroup struct {
-	GroupName  string   `yaml:"groupName"`
-	Extensions []string `yaml:"extensions"`
-}
-
 type PhraseList struct {
 	ListName  string        `yaml:"listName"`
 	IncludeIn []string      `yaml:"includeIn"`
@@ -56,24 +36,16 @@ type PhraseList struct {
 	Weighted  bool
 }
 
-type SiteLists struct {
-	ListName string      `yaml:"listName"`
-	Groups   []SiteGroup `yaml:"groups"`
+type ContentGroup struct {
+	GroupName string   `yaml:"name"`
+	Items     []string `yaml:"items"`
 }
 
-type RegexList struct {
-	ListName string       `yaml:"listName"`
-	Groups   []RegexGroup `yaml:"groups"`
-}
-
-type TypeList struct {
-	ListName string      `yaml:"listName"`
-	Groups   []TypeGroup `yaml:"groups"`
-}
-
-type ExtensionList struct {
-	ListName string           `yaml:"listName"`
-	Groups   []ExtensionGroup `yaml:"groups"`
+type ContentList struct {
+	ListName  string         `yaml:"list"`
+	IncludeIn []string       `yaml:"includeIn"`
+	Type      string         `yaml:"type"`
+	Groups    []ContentGroup `yaml:"groups"`
 }
 
 type AllowRule struct {
@@ -87,12 +59,9 @@ type DecryptRule struct {
 }
 
 type E2guardianConfig struct {
-	PhraseLists         []PhraseList     `yaml:"phraseLists"`
-	WeightedPhraseLists []PhraseList     `yaml:"weightedPhraseLists"`
-	SiteLists           []SiteGroup      `yaml:"siteLists"`
-	Regexpurlists       []RegexGroup     `yaml:"regexpurllists"`
-	Mimetypelists       []TypeGroup      `yaml:"mimetypelists"`
-	Extensionslists     []ExtensionGroup `yaml:"extensionslists"`
+	PhraseLists         []PhraseList  `yaml:"phraseLists"`
+	WeightedPhraseLists []PhraseList  `yaml:"weightedPhraseLists"`
+	Lists               []ContentList `yaml:"lists"`
 }
 
 type TlsSecret struct {
@@ -131,6 +100,22 @@ type FilterConfig struct {
 	RedisReplicas int       `yaml:"redisReplicas"`
 	RedisPassword string    `yaml:"redisPassword"`
 	Tls           TlsSecret `yaml:"tls,omitempty"`
+}
+
+var ListTypes = []string{"sitelist", "regexpurllist", "mimetypelist", "extensionslist"}
+
+var banLists = map[string]string{
+	"sitelist":       "bannedsitelist",
+	"regexpurllist":  "bannedregexpurllist",
+	"mimetypelist":   "bannedmimetypelist",
+	"extensionslist": "bannedextensionlist",
+}
+
+var allowLists = map[string]string{
+	"sitelist":       "exceptionsitelist",
+	"regexpurllist":  "exceptionregexpurllist",
+	"mimetypelist":   "exceptionmimetypelist",
+	"extensionslist": "exceptionextensionlist",
 }
 
 func getHelmPath() string {
@@ -406,10 +391,30 @@ func (config *E2guardianConfig) findWeightedPhraseList(listName string) *PhraseL
 	return nil
 }
 
+func (config *E2guardianConfig) findContentList(listName string) *ContentList {
+	for i := range config.Lists {
+		list := &config.Lists[i]
+		if list.ListName == listName {
+			return list
+		}
+	}
+	return nil
+}
+
 func (list *PhraseList) findPhraseGroup(groupName string) *PhraseGroup {
 	for i := range list.Groups {
 		group := &list.Groups[i]
-		if group.GroupName == groupName {
+		if group.GroupName == groupName || (groupName == "default" && group.GroupName == "") {
+			return group
+		}
+	}
+	return nil
+}
+
+func (list *ContentList) findContentGroup(groupName string) *ContentGroup {
+	for i := range list.Groups {
+		group := &list.Groups[i]
+		if group.GroupName == groupName || (groupName == "default" && group.GroupName == "") {
 			return group
 		}
 	}
@@ -432,6 +437,18 @@ func (config *E2guardianConfig) deletePhraseList(listName string) bool {
 			config.WeightedPhraseLists = append(
 				config.WeightedPhraseLists[:i],
 				config.WeightedPhraseLists[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (config *E2guardianConfig) deleteContentList(listName string) bool {
+	for i := range config.Lists {
+		if config.Lists[i].ListName == listName {
+			config.Lists = append(
+				config.Lists[:i],
+				config.Lists[i+1:]...)
 			return true
 		}
 	}
@@ -462,6 +479,15 @@ func (group *PhraseGroup) findPhrase(phrase Phrase) *Phrase {
 	return nil
 }
 
+func (group *ContentGroup) findEntry(entry string) string {
+	for _, currentEntry := range group.Items {
+		if currentEntry == entry {
+			return entry
+		}
+	}
+	return ""
+}
+
 func (group *PhraseGroup) removePhrase(phrase Phrase) []Phrase {
 	for i, currentPhrase := range group.Phrases {
 		if phrasesMatch(currentPhrase, phrase) {
@@ -471,7 +497,25 @@ func (group *PhraseGroup) removePhrase(phrase Phrase) []Phrase {
 	return group.Phrases
 }
 
+func (group *ContentGroup) removeEntry(entry string) []string {
+	for i, currentEntry := range group.Items {
+		if currentEntry == entry {
+			group.Items = append(group.Items[:i], group.Items[i+1:]...)
+		}
+	}
+	return group.Items
+}
+
 func (list *PhraseList) findInclude(fileName string) string {
+	for _, fname := range list.IncludeIn {
+		if fname == fileName {
+			return fname
+		}
+	}
+	return ""
+}
+
+func (list *ContentList) findInclude(fileName string) string {
 	for _, fname := range list.IncludeIn {
 		if fname == fileName {
 			return fname
@@ -487,6 +531,33 @@ func (list *PhraseList) removeInclude(fileName string) []string {
 		}
 	}
 	return list.IncludeIn
+}
+
+func (list *ContentList) removeInclude(fileName string) []string {
+	for i, fname := range list.IncludeIn {
+		if fname == fileName {
+			list.IncludeIn = append(list.IncludeIn[:i], list.IncludeIn[i+1:]...)
+		}
+	}
+	return list.IncludeIn
+}
+
+func (list *PhraseList) deleteGroup(groupName string) []PhraseGroup {
+	for i, gname := range list.Groups {
+		if gname.GroupName == groupName {
+			list.Groups = append(list.Groups[:i], list.Groups[i+1:]...)
+		}
+	}
+	return list.Groups
+}
+
+func (list *ContentList) deleteGroup(groupName string) []ContentGroup {
+	for i, gname := range list.Groups {
+		if gname.GroupName == groupName {
+			list.Groups = append(list.Groups[:i], list.Groups[i+1:]...)
+		}
+	}
+	return list.Groups
 }
 
 /*
@@ -617,7 +688,7 @@ func AddPhraseToList(listName string, phrase Phrase, group string, targetName st
 
 }
 
-/* Add phrase to existing list */
+/* Delete phrase from existing list */
 func DeletePhraseFromList(listName string, phrase Phrase, group string, targetName string) int {
 
 	config, err := getHostFilterConfig(targetName)
@@ -653,6 +724,59 @@ func DeletePhraseFromList(listName string, phrase Phrase, group string, targetNa
 	} else {
 		// Delete it here
 		phraseGroup.Phrases = phraseGroup.removePhrase(phrase)
+		if len(phraseGroup.Phrases) == 0 && phraseGroup.GroupName != "" {
+			phraseList.Groups = phraseList.deleteGroup(phraseGroup.GroupName)
+		}
+		err = writeHostFilterConfig(targetName, config)
+		if err != nil {
+			log.Fatal("Failed to write host config: ", err)
+			return -1
+		}
+		log.Printf("Successfully deleted phrase from list '%s'\n", listName)
+		return 0
+	}
+
+}
+
+/* Delete entry from existing list */
+func DeleteEntryFromList(listName string, entry string, group string, targetName string) int {
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	contentList := config.E2guardianConf.findContentList(listName)
+	if contentList == nil {
+		if contentList = config.E2guardianConf.findContentList(listName); contentList == nil {
+			log.Fatalf("Content list '%s' does not exist", listName)
+			return -1
+		}
+	}
+
+	contentGroup := contentList.findContentGroup(group)
+	if contentGroup == nil {
+		// Add this phrase group
+		contentList.Groups = append(contentList.Groups, ContentGroup{GroupName: group})
+		contentGroup = contentList.findContentGroup(group)
+	}
+
+	existingEntry := contentGroup.findEntry(entry)
+	if existingEntry == "" {
+		// no name group displayed as 'default'
+		groupName := "default"
+		if group != "" {
+			groupName = group
+		}
+		log.Fatalf("Entry '%s' doesn't exist in group '%s' of content list '%s'", entry, groupName, listName)
+		return -1
+	} else {
+		// Delete it here
+		contentGroup.Items = contentGroup.removeEntry(entry)
+		if len(contentGroup.Items) == 0 && contentGroup.GroupName != "" {
+			contentList.Groups = contentList.deleteGroup(contentGroup.GroupName)
+		}
 		err = writeHostFilterConfig(targetName, config)
 		if err != nil {
 			log.Fatal("Failed to write host config: ", err)
@@ -665,7 +789,7 @@ func DeletePhraseFromList(listName string, phrase Phrase, group string, targetNa
 }
 
 /* Include a phrase list in one of the main lists */
-func AddInclude(phraseList *PhraseList, config *FilterConfig, fileInclude string, targetName string) int {
+func AddPhraseInclude(phraseList *PhraseList, config *FilterConfig, fileInclude string, targetName string) int {
 
 	include := phraseList.findInclude(fileInclude)
 	if include != "" {
@@ -686,8 +810,30 @@ func AddInclude(phraseList *PhraseList, config *FilterConfig, fileInclude string
 
 }
 
+/* Include a content list in one of the main lists */
+func AddInclude(contentList *ContentList, config *FilterConfig, fileInclude string, targetName string) int {
+
+	include := contentList.findInclude(fileInclude)
+	if include != "" {
+		log.Fatalf("List '%s' is already included in '%s'\n", contentList.ListName, include)
+		return -1
+	}
+
+	contentList.IncludeIn = append(contentList.IncludeIn, fileInclude)
+
+	err := writeHostFilterConfig(targetName, *config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully included %s '%s' in '%s'\n", contentList.Type, contentList.ListName, fileInclude)
+	return 0
+
+}
+
 /* Clear includes from phrase list */
-func DeleteIncludes(listName string, targetName string) int {
+func DeletePhraseIncludes(listName string, targetName string) int {
 
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
@@ -716,7 +862,7 @@ func DeleteIncludes(listName string, targetName string) int {
 
 }
 
-func Blacklist(listName string, targetName string) int {
+func BlacklistPhrase(listName string, targetName string) int {
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
 		log.Fatal("Failed to get host config: \n", err)
@@ -732,13 +878,13 @@ func Blacklist(listName string, targetName string) int {
 	}
 
 	if phraseList.Weighted {
-		return AddInclude(phraseList, &config, "weightedphraselist", targetName)
+		return AddPhraseInclude(phraseList, &config, "weightedphraselist", targetName)
 	} else {
-		return AddInclude(phraseList, &config, "bannedphraselist", targetName)
+		return AddPhraseInclude(phraseList, &config, "bannedphraselist", targetName)
 	}
 }
 
-func Whitelist(listName string, targetName string) int {
+func WhitelistPhrase(listName string, targetName string) int {
 	config, err := getHostFilterConfig(targetName)
 	if err != nil {
 		log.Fatal("Failed to get host config: \n", err)
@@ -757,8 +903,68 @@ func Whitelist(listName string, targetName string) int {
 		log.Fatalf("Whitelist not supported for weighted; just apply negative weight to your terms")
 		return -1
 	} else {
-		return AddInclude(phraseList, &config, "exceptionphraselist", targetName)
+		return AddPhraseInclude(phraseList, &config, "exceptionphraselist", targetName)
 	}
+}
+
+func Blacklist(listName string, targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: \n", err)
+		return -1
+	}
+
+	contentList := config.E2guardianConf.findContentList(listName)
+	if contentList == nil {
+		log.Fatalf("Content list '%s' does not exist", listName)
+		return -1
+	}
+
+	return AddInclude(contentList, &config, banLists[contentList.Type], targetName)
+}
+
+func Whitelist(listName string, targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: \n", err)
+		return -1
+	}
+
+	contentList := config.E2guardianConf.findContentList(listName)
+	if contentList == nil {
+		log.Fatalf("Content list '%s' does not exist", listName)
+		return -1
+	}
+
+	return AddInclude(contentList, &config, allowLists[contentList.Type], targetName)
+}
+
+/* Clear includes from content list */
+func DeleteIncludes(listName string, targetName string) int {
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: \n", err)
+		return -1
+	}
+
+	contentList := config.E2guardianConf.findContentList(listName)
+	if contentList == nil {
+		log.Fatalf("Content list '%s' does not exist", listName)
+		return -1
+	}
+
+	contentList.IncludeIn = contentList.IncludeIn[:0]
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully cleared includes for %s '%s'\n", contentList.Type, listName)
+	return 0
+
 }
 
 /* Dump a given phrase list, or list all of them */
@@ -828,6 +1034,134 @@ func ShowPhraseList(listName string, targetName string, group string) int {
 				phraseString = fmt.Sprintf("%s (weight=%d)", phraseString, phrase.Weight)
 			}
 			log.Println(phraseString)
+		}
+	}
+
+	return 0
+}
+
+func AddContentList(listName string, listType string, targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	contentList := config.E2guardianConf.findContentList((listName))
+	if contentList != nil {
+		log.Fatalf("Phrase list '%s' already exists", listName)
+		return -1
+	}
+
+	config.E2guardianConf.Lists = append(config.E2guardianConf.Lists, ContentList{ListName: listName, Type: listType})
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully added phrase list '%s'\n", listName)
+	return 0
+}
+
+func AddEntryToContentList(listName string, group string, entry string, targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	contentList := config.E2guardianConf.findContentList((listName))
+	if contentList == nil {
+		log.Fatalf("Content list '%s' doesn't exist", listName)
+		return -1
+	}
+
+	contentGroup := contentList.findContentGroup(group)
+	if contentGroup == nil {
+		// Add this phrase group
+		contentList.Groups = append(contentList.Groups, ContentGroup{GroupName: group})
+		contentGroup = contentList.findContentGroup(group)
+	}
+
+	existingEntry := contentGroup.findEntry(entry)
+	if existingEntry != "" {
+		// no name group displayed as 'default'
+		groupName := "default"
+		if group != "" {
+			groupName = group
+		}
+		log.Fatalf("Entry '%s' already exists in group '%s' of %s '%s'", entry, groupName, contentList.Type, listName)
+		return -1
+	}
+
+	contentGroup.Items = append(contentGroup.Items, entry)
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully added phrase to list '%s'\n", listName)
+	return 0
+
+}
+
+/* Dump a given content list, or list all of them */
+func ShowContentList(listName string, targetName string, group string) int {
+
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	if listName == "" {
+		// Just show the names of all phrase lists
+		log.Println("=== CONTENT LISTS ===")
+		for i := range config.E2guardianConf.Lists {
+			log.Printf("%s (type='%s')\n", config.E2guardianConf.Lists[i].ListName, config.E2guardianConf.Lists[i].Type)
+		}
+		return -1
+	}
+
+	contentList := config.E2guardianConf.findContentList(listName)
+	if contentList == nil {
+		log.Fatalf("Content list '%s' does not exist", listName)
+		return -1
+	}
+
+	var groups []ContentGroup
+
+	if group != "" {
+		contentGroup := contentList.findContentGroup(group)
+		if contentGroup == nil {
+			log.Fatalf("Group '%s' does not exist for content list '%s'", group, listName)
+			return -1
+		}
+		groups = []ContentGroup{*contentGroup}
+	} else {
+		groups = contentList.Groups
+	}
+
+	// Dump includes
+	log.Printf("=== INCLUDES ===")
+	for _, inc := range contentList.IncludeIn {
+		log.Println(inc)
+	}
+
+	for i := range groups {
+		group := groups[i]
+		log.Printf("Group: %s", group.GroupName)
+
+		// Dump includes
+
+		log.Printf("=== ENTRIES ===")
+		for j := range group.Items {
+			item := group.Items[j]
+			log.Println(item)
 		}
 	}
 

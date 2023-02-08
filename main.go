@@ -94,36 +94,42 @@ var CLI struct {
 		} `cmd:"" name:"phrase-list" help:"Configure phrase lists for content scanning"`
 		ContentList struct {
 			AddList struct {
+				Type string `arg:"" name:"type" help:"Type of list"`
 				Name string `arg:"" name:"name" help:"Name of the content list to create"`
 			} `cmd:"" name:"add-list" help:"Add a content list"`
 			RemoveList struct {
 				Name string `arg:"" name:"name" help:"Name of the content list to delete"`
 			} `cmd:"" name:"remove-list" help:"Delete an existing content list"`
-			AddLine struct {
+			AddEntry struct {
 				Name  string `arg:"" name:"name" help:"Name of the content list to modify"`
-				Line  string `arg:"" name:"phrase" help:"Line to add to the content list" type:"string" required:"true"`
+				Entry string `arg:"" name:"entry" help:"Line to add to the content list" type:"string" required:"true"`
 				Group string `name:"group" help:"name of content group"`
-			} `cmd:"" name:"add-line" help:"Add a line to an existing content list"`
-			RemoveLine struct {
-				Name   string `arg:"" name:"name" help:"Name of the content list to modify"`
-				Phrase string `arg:"" name:"phrase" help:"Name of content list file include to delete" type:"string"`
-				Group  string `name:"group" help:"name of content group"`
-			} `cmd:"" name:"remove-line" help:"Remove a phrase from an existing list"`
-			AddInclude struct {
-				Name       string `arg:"" name:"name" help:"Name of the content list to be included" required:"true"`
-				ActionList string `arg:"" name:"filename" help:"Name of the action list to add include" required:"true"`
-				Group      string `name:"group" help:"name of content group"`
-			} `cmd:"" name:"add-include" help:"Include content list to one of the action lists"`
-			DeleteInclude struct {
-				Name       string `arg:"" name:"name" help:"Name of the content list to be excluded" required:"true"`
-				ActionList string `arg:"" name:"filename" help:"Name of action list to delete include from" required:"true"`
-				Group      string `name:"group" help:"name of content group"`
-			} `cmd:"" name:"remove-include" help:"Delete an include from a list"`
+			} `cmd:"" name:"add-entry" help:"Add an entry to an existing content list"`
+			RemoveEntry struct {
+				Name  string `arg:"" name:"name" help:"Name of the content list to modify"`
+				Entry string `arg:"" name:"entry" help:"Entry to delete from content list" type:"string"`
+				Group string `name:"group" help:"name of content group"`
+			} `cmd:"" name:"remove-entry" help:"Remove an entry from an existing content list"`
+			Blacklist struct {
+				Name string `arg:"" name:"name" help:"Name of the content list to be blacklisted" required:"true"`
+			} `cmd:"" name:"blacklist" help:"Blacklist this content list"`
+			Whitelist struct {
+				Name string `arg:"" name:"name" help:"Name of the content list to be whitelisted" required:"true"`
+			} `cmd:"" name:"whitelist" help:"Whitelist this content list"`
+			Clear struct {
+				Name string `arg:"" name:"name" help:"Name of the content list to be cleared" required:"true"`
+			} `cmd:"" name:"clear" help:"Clear all includes from a content list"`
+			Show struct {
+				Name  string `name:"name" help:"Name of the content list to show"`
+				Group string `name:"group" help:"name of content group"`
+			} `cmd:"" name:"show" help:"Dump the contents of a content list"`
 		} `cmd:"" name:"content-list" help:"Configure content lists for content scanning"`
 		Acl struct {
 		} `cmd:"" name:"acl" help:"Configure acl lists for proxy"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
 }
+
+var listTypes = []string{"sitelist", "regexpurllist", "mimetypelist", "extensionslist"}
 
 func main() {
 	var code int = 0
@@ -184,15 +190,34 @@ func main() {
 		}
 		code = utils.DeletePhraseFromList(CLI.Filter.PhraseList.RemovePhrase.Name, phrase, CLI.Filter.PhraseList.RemovePhrase.Group, target)
 	case "filter phrase-list blacklist <name>":
-		code = utils.Blacklist(CLI.Filter.PhraseList.Blacklist.Name, target)
+		code = utils.BlacklistPhrase(CLI.Filter.PhraseList.Blacklist.Name, target)
 	case "filter phrase-list whitelist <name>":
-		code = utils.Whitelist(CLI.Filter.PhraseList.Whitelist.Name, target)
+		code = utils.WhitelistPhrase(CLI.Filter.PhraseList.Whitelist.Name, target)
 	case "filter phrase-list clear <name>":
-		code = utils.DeleteIncludes(CLI.Filter.PhraseList.Clear.Name, target)
+		code = utils.DeletePhraseIncludes(CLI.Filter.PhraseList.Clear.Name, target)
 	case "filter phrase-list show":
 		code = utils.ShowPhraseList(CLI.Filter.PhraseList.Show.Name, target, CLI.Filter.PhraseList.Show.Group)
+	case "filter content-list add-list <type> <name>":
+		valid := false
+		for _, t := range utils.ListTypes {
+			if t == CLI.Filter.ContentList.AddList.Type {
+				valid = true
+			}
+		}
+		if !valid {
+			log.Fatalf("Invalid list type: '%s' Valid options are: %s\n", CLI.Filter.ContentList.AddList.Type, strings.Join(listTypes, ", "))
+			code = -1
+		} else {
+			code = utils.AddContentList(CLI.Filter.ContentList.AddList.Name, CLI.Filter.ContentList.AddList.Type, target)
+		}
+	case "filter content-list add-entry <name> <entry>":
+		code = utils.AddEntryToContentList(CLI.Filter.ContentList.AddEntry.Name, CLI.Filter.ContentList.AddEntry.Group, CLI.Filter.ContentList.AddEntry.Entry, target)
+	case "filter content-list remove-entry <name> <entry>":
+		code = utils.DeleteEntryFromList(CLI.Filter.ContentList.RemoveEntry.Name, CLI.Filter.ContentList.RemoveEntry.Entry, CLI.Filter.ContentList.RemoveEntry.Group, target)
 	case "filter safe-search <command>":
 		code = utils.SafeSearch(CLI.Filter.SafeSearch.Command, target)
+	case "filter content-list show":
+		code = utils.ShowContentList(CLI.Filter.ContentList.Show.Name, target, CLI.Filter.ContentList.Show.Group)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1
