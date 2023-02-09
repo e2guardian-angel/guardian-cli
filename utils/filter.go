@@ -483,7 +483,7 @@ func (config *FilterConfig) AddAclRule(category string, action string, pos int) 
 		if pos < 0 || pos > len(config.AllowRules) {
 			i = len(config.AllowRules)
 		}
-		after := append([]AllowRule{AllowRule{Category: category, Allow: allow}}, config.AllowRules[i:]...)
+		after := append([]AllowRule{{Category: category, Allow: allow}}, config.AllowRules[i:]...)
 		config.AllowRules = append(config.AllowRules[:i], after...)
 	} else {
 		decrypt := (action == "decrypt")
@@ -519,7 +519,7 @@ func (config *FilterConfig) DeleteDecryptRule(category string, action string) []
 
 func (config *FilterConfig) shouldDecrypt() bool {
 	for _, rule := range config.DecryptRules {
-		if rule.Decrypt == true {
+		if rule.Decrypt {
 			return true
 		}
 	}
@@ -593,24 +593,6 @@ func (list *ContentList) findInclude(fileName string) string {
 		}
 	}
 	return ""
-}
-
-func (list *PhraseList) removeInclude(fileName string) []string {
-	for i, fname := range list.IncludeIn {
-		if fname == fileName {
-			list.IncludeIn = append(list.IncludeIn[:i], list.IncludeIn[i+1:]...)
-		}
-	}
-	return list.IncludeIn
-}
-
-func (list *ContentList) removeInclude(fileName string) []string {
-	for i, fname := range list.IncludeIn {
-		if fname == fileName {
-			list.IncludeIn = append(list.IncludeIn[:i], list.IncludeIn[i+1:]...)
-		}
-	}
-	return list.IncludeIn
 }
 
 func (list *PhraseList) deleteGroup(groupName string) []PhraseGroup {
@@ -1120,7 +1102,7 @@ func AddContentList(listName string, listType string, targetName string) int {
 
 	contentList := config.E2guardianConf.findContentList((listName))
 	if contentList != nil {
-		log.Fatalf("Phrase list '%s' already exists", listName)
+		log.Fatalf("Content list '%s' already exists with type %s", listName, contentList.Type)
 		return -1
 	}
 
@@ -1132,7 +1114,32 @@ func AddContentList(listName string, listType string, targetName string) int {
 		return -1
 	}
 
-	log.Printf("Successfully added phrase list '%s'\n", listName)
+	log.Printf("Successfully added %s '%s'\n", listType, listName)
+	return 0
+}
+
+func DeleteContentList(listName string, targetName string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	contentList := config.E2guardianConf.findContentList((listName))
+	if contentList == nil {
+		log.Fatalf("Content list '%s' does not exist", listName)
+		return -1
+	}
+
+	config.E2guardianConf.deleteContentList(listName)
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	log.Printf("Successfully deleted %s '%s'\n", contentList.Type, listName)
 	return 0
 }
 

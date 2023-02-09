@@ -128,12 +128,12 @@ var CLI struct {
 			AddRule struct {
 				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
 				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
-				Position int    `name:"position" help:"Position of rule in ordered acl list" default:-1`
+				Position int    `name:"position" help:"Position of rule in ordered acl list" default:"-1"`
 			} `cmd:"" name:"add" help:"Adds an ACL rule"`
 			DeleteRule struct {
 				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
 				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
-				Position int    `name:"position" help:"Position of rule in ordered acl list" default:-1`
+				Position int    `name:"position" help:"Position of rule in ordered acl list" default:"-1"`
 			} `cmd:"" name:"delete" help:"Deletes an ACL rule"`
 			Show struct {
 			} `cmd:"" name:"show" help:"Show all acl rules"`
@@ -222,6 +222,8 @@ func main() {
 		} else {
 			code = utils.AddContentList(CLI.Filter.ContentList.AddList.Name, CLI.Filter.ContentList.AddList.Type, target)
 		}
+	case "filter content-list remove-list <name>":
+		code = utils.DeleteContentList(CLI.Filter.ContentList.RemoveList.Name, target)
 	case "filter content-list add-entry <name> <entry>":
 		code = utils.AddEntryToContentList(CLI.Filter.ContentList.AddEntry.Name, CLI.Filter.ContentList.AddEntry.Group, CLI.Filter.ContentList.AddEntry.Entry, target)
 	case "filter content-list remove-entry <name> <entry>":
