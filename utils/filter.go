@@ -1335,21 +1335,21 @@ func ShowAclRules(targetName string) int {
 	}
 
 	log.Printf("=== DECRYPT RULES ===")
-	for _, rule := range config.DecryptRules {
+	for i, rule := range config.DecryptRules {
 		action := "decrypt"
 		if !rule.Decrypt {
 			action = "nodecrypt"
 		}
-		log.Printf("Category: '%s', Action: '%s'\n", rule.Category, action)
+		log.Printf("%d | Category: '%s', Action: '%s'\n", i, rule.Category, action)
 	}
 
 	log.Printf("=== ALLOW RULES ===")
-	for _, rule := range config.AllowRules {
+	for i, rule := range config.AllowRules {
 		action := "allow"
 		if !rule.Allow {
 			action = "deny"
 		}
-		log.Printf("Category: '%s', Action: '%s'", rule.Category, action)
+		log.Printf("%d | Category: '%s', Action: '%s'", i, rule.Category, action)
 	}
 
 	return 0

@@ -139,6 +139,14 @@ var CLI struct {
 			} `cmd:"" name:"show" help:"Show all acl rules"`
 		} `cmd:"" name:"acl" help:"Configure acl lists for proxy"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
+	Config struct {
+		Export struct {
+			Output string `name:"output" help:"Output file path to export to" required:"true"`
+		} `cmd:"" name:"export" help:"Exports config to file"`
+		Import struct {
+			Input string `name:"input" help:"Input file path to import from" required:"true"`
+		} `cmd:"" name:"import" help:"Imports config from file"`
+	} `cmd:"" help:"Export/Import configuration to file"`
 }
 
 var listTypes = []string{"sitelist", "regexpurllist", "mimetypelist", "extensionslist"}
@@ -244,6 +252,10 @@ func main() {
 		code = utils.DeleteAclRule(CLI.Filter.Acl.DeleteRule.Category, CLI.Filter.Acl.DeleteRule.Action, target)
 	case "filter acl show":
 		code = utils.ShowAclRules(target)
+	case "config import":
+		code = utils.ImportConfigs(CLI.Config.Import.Input)
+	case "config export":
+		code = utils.ExportConfigs(CLI.Config.Export.Output)
 	default:
 		log.Fatal("Unknown command. Use '--help' to get a list of valid commands.")
 		code = -1
