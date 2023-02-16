@@ -100,7 +100,7 @@ func Setup(name string) int {
 
 	log.Printf("Executing playbook on target host \"%s\"...\n", target.Name)
 
-	password := os.Getenv(fmt.Sprintf("SUDO_PASSWORD_%s", target.Name))
+	password := os.Getenv("SUDO_PASSWORD")
 	if password == "" {
 		log.Printf("You will need to enter your password for sudo access.")
 		password, err = getUserCredentials()
