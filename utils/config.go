@@ -173,7 +173,7 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 		return -1
 	}
 
-	password := os.Getenv(fmt.Sprintf("NEWHOST_PASSWORD_%s", newHost.Name))
+	password := os.Getenv("NEWHOST_PASSWORD")
 	if password == "" {
 		fmt.Println("Need remote password to copy keys to remote host.")
 		password, err = getUserCredentials()
