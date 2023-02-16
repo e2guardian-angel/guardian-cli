@@ -111,7 +111,7 @@ func Setup(name string) int {
 
 	_, err = client.RunCommandsWithPrompts([]string{
 		fmt.Sprintf("cd %s", dstPath),
-		"sudo ./setup.sh",
+		"sudo bash setup.sh",
 	}, map[string]string{
 		"[sudo] password for ": password,
 	}, true)
