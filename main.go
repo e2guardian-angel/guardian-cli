@@ -50,12 +50,12 @@ var CLI struct {
 		} `cmd:"" name:"deploy" help:"Deploy filter stack to target host"`
 		Backup struct {
 			ToFile string `name:"to-file" help:"path to backup file" type:"filename" required:"true"`
-		} `cmd:"" name:"deploy" help:"Backup target host's filter configuration"`
+		} `cmd:"" name:"backup" help:"Backup target host's filter configuration"`
 		Restore struct {
 			FromFile string `name:"from-file" help:"Restore configuration from a backup file" type:"filename" required:"true"`
-		} `cmd:"" name:"deploy" help:"Restore target host's filter configuration from a backup file"`
+		} `cmd:"" name:"restore" help:"Restore target host's filter configuration from a backup file"`
 		Uninstall struct {
-		} `cmd:"" name:"deploy" help:"Uninstall filter stack on target host"`
+		} `cmd:"" name:"uninstall" help:"Uninstall filter stack on target host"`
 		SafeSearch struct {
 			Command string `arg:"" name:"command" help:"Safesearch is enforced (on/off/show)"`
 		} `cmd:"" name:"safe-search" help:"Safe search option"`
