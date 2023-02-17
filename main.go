@@ -138,6 +138,19 @@ var CLI struct {
 			Show struct {
 			} `cmd:"" name:"show" help:"Show all acl rules"`
 		} `cmd:"" name:"acl" help:"Configure acl lists for proxy"`
+		ReleaseTag struct {
+			Tag string `arg:"" name:"tag" help:"Name of tag to apply to images"`
+		} `cmd:"" name:"release-tag" help:"Release tag for CI/CD images"`
+		Certificate struct {
+			Create struct {
+				CommonName   string `name:"common-name" help:"Common Name for the certificate subject line" default:"guardian.angel"`
+				Country      string `name:"country" help:"Country code for the certificate subject line" default:"US"`
+				State        string `name:"state" help:"State/Province for the certificate subject line" default:"Texas"`
+				Locality     string `name:"locality" help:"Locality (usually the city) for the certificate subject line" default:"Austin"`
+				Organization string `name:"organization" help:"Organization Name for the certificate subject line" default:"BlueStar"`
+				OrgUnit      string `name:"org-unit" help:"Organizational Unit for the certificate subject line" default:"Security"`
+			} `cmd:"" name:"create" help:"Generates a new certificate/key pair for decryption"`
+		} `cmd:"" name:"certificate" help:"Manage decryption certificate"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
 	Config struct {
 		Export struct {
@@ -159,7 +172,7 @@ func main() {
 	target := CLI.Filter.Target
 	if strings.Contains(ctx.Command(), "filter") && target == "" {
 		var err error
-		err, target = utils.GetTargetSelection()
+		target, err = utils.GetTargetSelection()
 		if err != nil {
 			log.Fatalf("For filter commands, you must either use the '--target' flag, or select a target using 'guardian-cli target select'\n")
 			os.Exit(-1)
@@ -252,6 +265,10 @@ func main() {
 		code = utils.DeleteAclRule(CLI.Filter.Acl.DeleteRule.Category, CLI.Filter.Acl.DeleteRule.Action, target)
 	case "filter acl show":
 		code = utils.ShowAclRules(target)
+	case "filter release-tag <tag>":
+		code = utils.SetReleaseTag(target, CLI.Filter.ReleaseTag.Tag)
+	case "filter certificate create":
+		code = utils.SetupCertificate(target, CLI.Filter.Certificate.Create.CommonName, CLI.Filter.Certificate.Create.Organization, CLI.Filter.Certificate.Create.OrgUnit, CLI.Filter.Certificate.Create.Country, CLI.Filter.Certificate.Create.State, CLI.Filter.Certificate.Create.Locality)
 	case "config import":
 		code = utils.ImportConfigs(CLI.Config.Import.Input)
 	case "config export":

@@ -46,8 +46,8 @@ func compress(src string, buf io.Writer) error {
 		// walk through every file in the folder
 		filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
 			// generate tar header
-			header, err := tar.FileInfoHeader(fi, file)
-			if err != nil {
+			header, e := tar.FileInfoHeader(fi, file)
+			if e != nil {
 				return err
 			}
 
@@ -59,17 +59,17 @@ func compress(src string, buf io.Writer) error {
 			}
 
 			// write header
-			if err := tw.WriteHeader(header); err != nil {
-				return err
+			if e := tw.WriteHeader(header); err != nil {
+				return e
 			}
 			// if not a dir, write file content
 			if !fi.IsDir() {
-				data, err := os.Open(file)
-				if err != nil {
-					return err
+				data, e := os.Open(file)
+				if e != nil {
+					return e
 				}
-				if _, err := io.Copy(tw, data); err != nil {
-					return err
+				if _, e := io.Copy(tw, data); e != nil {
+					return e
 				}
 			}
 			return nil
@@ -90,14 +90,6 @@ func compress(src string, buf io.Writer) error {
 	return nil
 }
 
-// check for path traversal and correct forward slashes
-func validRelPath(p string) bool {
-	if p == "" || strings.Contains(p, `\`) || strings.HasPrefix(p, "/") || strings.Contains(p, "../") {
-		return false
-	}
-	return true
-}
-
 func decompress(src io.Reader, dst string) error {
 	// ungzip
 	zr, err := gzip.NewReader(src)
@@ -116,10 +108,9 @@ func decompress(src io.Reader, dst string) error {
 		if err != nil {
 			return err
 		}
-		target := header.Name
 
 		// add dst + re-format slashes according to system
-		target = filepath.Join(dst, header.Name)
+		target := filepath.Join(dst, header.Name)
 		// if no join is needed, replace with ToSlash:
 		// target = filepath.ToSlash(header.Name)
 
@@ -163,7 +154,7 @@ func ExportConfigs(outputFile string) int {
 		return -1
 	}
 	// TODO: optional AES encryption
-	fileToWrite, err := os.OpenFile(outputFile, os.O_CREATE|os.O_RDWR, os.FileMode(700))
+	fileToWrite, err := os.OpenFile(outputFile, os.O_CREATE|os.O_RDWR, os.FileMode(0700))
 	if err != nil {
 		log.Fatalf("Failed to open backup file: %s\n", err)
 		return -1
@@ -180,7 +171,7 @@ func ExportConfigs(outputFile string) int {
 func ImportConfigs(inputFile string) int {
 	configHome := GuardianConfigHome()
 	var buf bytes.Buffer
-	fileToRead, err := os.OpenFile(inputFile, os.O_RDONLY, os.FileMode(600))
+	fileToRead, err := os.OpenFile(inputFile, os.O_RDONLY, os.FileMode(0600))
 	if err != nil {
 		log.Fatalf("Failed to open backup file: %s\n", err)
 		return -1

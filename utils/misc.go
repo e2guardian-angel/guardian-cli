@@ -52,10 +52,10 @@ func getUserCredentials() (string, error) {
 /*
  * Get currently selected target
  */
-func GetTargetSelection() (error, string) {
+func GetTargetSelection() (string, error) {
 	targetSelectFile := path.Join(GuardianConfigHome(), ".target")
 	content, err := os.ReadFile(targetSelectFile)
-	return err, string(content)
+	return string(content), err
 }
 
 /*
@@ -70,7 +70,7 @@ func SelectTargetHost(name string) int {
 		if _, err := os.Stat(targetSelectFile); err != nil {
 			log.Println("No target currently selected")
 		} else {
-			err, target := GetTargetSelection()
+			target, err := GetTargetSelection()
 			if err != nil {
 				log.Fatalln("Failed to read target select file")
 				return -1

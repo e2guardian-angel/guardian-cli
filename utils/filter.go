@@ -1,6 +1,7 @@
 package utils
 
 import (
+	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -100,6 +101,8 @@ type FilterConfig struct {
 	RedisReplicas int       `yaml:"redisReplicas"`
 	RedisPassword string    `yaml:"redisPassword"`
 	Tls           TlsSecret `yaml:"tls,omitempty"`
+	// CI/CD
+	ReleaseTag string `yaml:"releaseTag,omitempty"`
 }
 
 var ListTypes = []string{"sitelist", "regexpurllist", "mimetypelist", "extensionslist"}
@@ -491,9 +494,8 @@ func (config *FilterConfig) AddAclRule(category string, action string, pos int) 
 		if pos < 0 || pos > len(config.DecryptRules) {
 			i = len(config.DecryptRules)
 		}
-		before := append(config.DecryptRules[:i], DecryptRule{Category: category, Decrypt: decrypt})
-		after := config.DecryptRules[i+1:]
-		config.DecryptRules = append(before, after...)
+		after := append([]DecryptRule{{Category: category, Decrypt: decrypt}}, config.DecryptRules[i:]...)
+		config.DecryptRules = append(config.DecryptRules[:i], after...)
 	}
 }
 
@@ -1275,8 +1277,16 @@ func AddAclRule(category string, action string, targetName string, pos int) int 
 
 	config.AddAclRule(category, action, pos)
 
-	// Set DecryptHTTPS if applicable
-	config.DecryptHTTPS = config.shouldDecrypt()
+	// Check if TLS cert is setup
+	if config.shouldDecrypt() {
+		if config.Tls.Cert == "" || config.Tls.Key == "" {
+			log.Fatalf("Error: you need to set up a decrypt certifcate/key pair before creating any decrypt rules.")
+			return -1
+		} else {
+			// Set DecryptHTTPS if applicable
+			config.DecryptHTTPS = true
+		}
+	}
 
 	err = writeHostFilterConfig(targetName, config)
 	if err != nil {
@@ -1389,6 +1399,98 @@ func SafeSearch(enforced string, targetName string) int {
 	}
 
 	return 0
+}
+
+func SetReleaseTag(targetName string, releaseTag string) int {
+	config, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	config.ReleaseTag = releaseTag
+
+	err = writeHostFilterConfig(targetName, config)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	fmt.Printf("Set release tag to %s\n", releaseTag)
+	return 0
+}
+
+func SetupCertificate(targetName string, cn string, org string, ou string, country string, state string, locality string) int {
+
+	filterConfig, err := getHostFilterConfig(targetName)
+	if err != nil {
+		log.Fatal("Failed to get host config: ", err)
+		return -1
+	}
+
+	config, err := loadConfig()
+	if err != nil {
+		return -1
+	}
+
+	_, host := FindHost(config, targetName)
+	if host.Name != targetName {
+		log.Fatalf("host '%s' not configured", targetName)
+		return -1
+	}
+
+	client, err := getHostSshClient(host)
+	if err != nil {
+		log.Fatal("Failed to create SSH connection: ", err)
+		return -1
+	}
+	err = client.NewCryptoContext()
+	if err != nil {
+		log.Fatal("Failed to create SSH connection: ", err)
+		return -1
+	}
+
+	subjectLine := fmt.Sprintf("/CN=%s/C=%s/ST=%s/L=%s/O=%s/OU=%s", cn, country, state, locality, org, ou)
+	crtFile := fmt.Sprintf("%s/.guardian/filter.crt", host.HomePath)
+	keyFile := fmt.Sprintf("%s/.guardian/filter.key", host.HomePath)
+
+	_, err = client.RunCommands([]string{
+		fmt.Sprintf("openssl req -newkey rsa:2048 -nodes -keyout %s -x509 -days 365 -out %s -subj %s", keyFile, crtFile, subjectLine),
+	}, false)
+	if err != nil {
+		log.Fatal("Failed to run command: ", err)
+		return -1
+	}
+
+	key, err := client.RunCommands([]string{
+		fmt.Sprintf("cat %s", keyFile),
+	}, false)
+	if err != nil {
+		log.Fatal("Failed to get key: ", err)
+		return -1
+	}
+
+	cert, err := client.RunCommands([]string{
+		fmt.Sprintf("cat %s", crtFile),
+	}, false)
+	if err != nil {
+		log.Fatal("Failed to get cert: ", err)
+		return -1
+	}
+
+	filterConfig.Tls.Cert = b64.StdEncoding.EncodeToString([]byte(cert))
+	filterConfig.Tls.Key = b64.StdEncoding.EncodeToString([]byte(key))
+
+	err = writeHostFilterConfig(targetName, filterConfig)
+	if err != nil {
+		log.Fatal("Failed to write host config: ", err)
+		return -1
+	}
+
+	fmt.Println("Decryption cert set up successfully.")
+
+	return 0
+
 }
 
 /* Deploy changes to target */
