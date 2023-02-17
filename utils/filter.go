@@ -1,7 +1,6 @@
 package utils
 
 import (
-	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -65,11 +64,6 @@ type E2guardianConfig struct {
 	Lists               []ContentList `yaml:"lists"`
 }
 
-type TlsSecret struct {
-	Cert string `yaml:"cert,omitempty"`
-	Key  string `yaml:"key,omitempty"`
-}
-
 type FilterConfig struct {
 	// Host specific
 	MasterNode string `yaml:"masterNode"`
@@ -98,11 +92,18 @@ type FilterConfig struct {
 	DbPassword         string `yaml:"dbPassword"`
 	DbVolumeSize       string `yaml:"dbVolumeSize"`
 	// Redis config
-	RedisReplicas int       `yaml:"redisReplicas"`
-	RedisPassword string    `yaml:"redisPassword"`
-	Tls           TlsSecret `yaml:"tls,omitempty"`
+	RedisReplicas int    `yaml:"redisReplicas"`
+	RedisPassword string `yaml:"redisPassword"`
+
 	// CI/CD
 	ReleaseTag string `yaml:"releaseTag,omitempty"`
+
+	// Certificate
+	CommonName   string `yaml:"commonName"`
+	Organization string `yaml:"organization"`
+	Country      string `yaml:"country"`
+	State        string `yaml:"state"`
+	Locality     string `yaml:"locality"`
 }
 
 var ListTypes = []string{"sitelist", "regexpurllist", "mimetypelist", "extensionslist"}
@@ -1277,16 +1278,8 @@ func AddAclRule(category string, action string, targetName string, pos int) int 
 
 	config.AddAclRule(category, action, pos)
 
-	// Check if TLS cert is setup
-	if config.shouldDecrypt() {
-		if config.Tls.Cert == "" || config.Tls.Key == "" {
-			log.Fatalf("Error: you need to set up a decrypt certifcate/key pair before creating any decrypt rules.")
-			return -1
-		} else {
-			// Set DecryptHTTPS if applicable
-			config.DecryptHTTPS = true
-		}
-	}
+	// Set DecryptHTTPS if applicable
+	config.DecryptHTTPS = config.shouldDecrypt()
 
 	err = writeHostFilterConfig(targetName, config)
 	if err != nil {
@@ -1420,68 +1413,21 @@ func SetReleaseTag(targetName string, releaseTag string) int {
 	return 0
 }
 
-func SetupCertificate(targetName string, cn string, org string, ou string, country string, state string, locality string) int {
+func SetupCertificate(targetName string, cn string, org string, country string, state string, locality string) int {
 
-	filterConfig, err := getHostFilterConfig(targetName)
+	config, err := getHostFilterConfig(targetName)
 	if err != nil {
 		log.Fatal("Failed to get host config: ", err)
 		return -1
 	}
 
-	config, err := loadConfig()
-	if err != nil {
-		return -1
-	}
+	config.CommonName = cn
+	config.Organization = org
+	config.Country = country
+	config.State = state
+	config.Locality = locality
 
-	_, host := FindHost(config, targetName)
-	if host.Name != targetName {
-		log.Fatalf("host '%s' not configured", targetName)
-		return -1
-	}
-
-	client, err := getHostSshClient(host)
-	if err != nil {
-		log.Fatal("Failed to create SSH connection: ", err)
-		return -1
-	}
-	err = client.NewCryptoContext()
-	if err != nil {
-		log.Fatal("Failed to create SSH connection: ", err)
-		return -1
-	}
-
-	subjectLine := fmt.Sprintf("/CN=%s/C=%s/ST=%s/L=%s/O=%s/OU=%s", cn, country, state, locality, org, ou)
-	crtFile := fmt.Sprintf("%s/.guardian/filter.crt", host.HomePath)
-	keyFile := fmt.Sprintf("%s/.guardian/filter.key", host.HomePath)
-
-	_, err = client.RunCommands([]string{
-		fmt.Sprintf("openssl req -newkey rsa:2048 -nodes -keyout %s -x509 -days 365 -out %s -subj %s", keyFile, crtFile, subjectLine),
-	}, false)
-	if err != nil {
-		log.Fatal("Failed to run command: ", err)
-		return -1
-	}
-
-	key, err := client.RunCommands([]string{
-		fmt.Sprintf("cat %s", keyFile),
-	}, false)
-	if err != nil {
-		log.Fatal("Failed to get key: ", err)
-		return -1
-	}
-
-	cert, err := client.RunCommands([]string{
-		fmt.Sprintf("cat %s", crtFile),
-	}, false)
-	if err != nil {
-		log.Fatal("Failed to get cert: ", err)
-		return -1
-	}
-
-	filterConfig.Tls.Cert = b64.StdEncoding.EncodeToString([]byte(cert))
-	filterConfig.Tls.Key = b64.StdEncoding.EncodeToString([]byte(key))
-
-	err = writeHostFilterConfig(targetName, filterConfig)
+	err = writeHostFilterConfig(targetName, config)
 	if err != nil {
 		log.Fatal("Failed to write host config: ", err)
 		return -1

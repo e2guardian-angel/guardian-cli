@@ -142,14 +142,13 @@ var CLI struct {
 			Tag string `arg:"" name:"tag" help:"Name of tag to apply to images"`
 		} `cmd:"" name:"release-tag" help:"Release tag for CI/CD images"`
 		Certificate struct {
-			Create struct {
+			Configure struct {
 				CommonName   string `name:"common-name" help:"Common Name for the certificate subject line" default:"guardian.angel"`
 				Country      string `name:"country" help:"Country code for the certificate subject line" default:"US"`
 				State        string `name:"state" help:"State/Province for the certificate subject line" default:"Texas"`
 				Locality     string `name:"locality" help:"Locality (usually the city) for the certificate subject line" default:"Austin"`
-				Organization string `name:"organization" help:"Organization Name for the certificate subject line" default:"BlueStar"`
-				OrgUnit      string `name:"org-unit" help:"Organizational Unit for the certificate subject line" default:"Security"`
-			} `cmd:"" name:"create" help:"Generates a new certificate/key pair for decryption"`
+				Organization string `name:"organization" help:"Organization name for the certificate subject line" default:"Security"`
+			} `cmd:"" name:"configure" help:"Generates a new certificate/key pair for decryption"`
 		} `cmd:"" name:"certificate" help:"Manage decryption certificate"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
 	Config struct {
@@ -267,8 +266,8 @@ func main() {
 		code = utils.ShowAclRules(target)
 	case "filter release-tag <tag>":
 		code = utils.SetReleaseTag(target, CLI.Filter.ReleaseTag.Tag)
-	case "filter certificate create":
-		code = utils.SetupCertificate(target, CLI.Filter.Certificate.Create.CommonName, CLI.Filter.Certificate.Create.Organization, CLI.Filter.Certificate.Create.OrgUnit, CLI.Filter.Certificate.Create.Country, CLI.Filter.Certificate.Create.State, CLI.Filter.Certificate.Create.Locality)
+	case "filter certificate configure":
+		code = utils.SetupCertificate(target, CLI.Filter.Certificate.Configure.CommonName, CLI.Filter.Certificate.Configure.Organization, CLI.Filter.Certificate.Configure.Country, CLI.Filter.Certificate.Configure.State, CLI.Filter.Certificate.Configure.Locality)
 	case "config import":
 		code = utils.ImportConfigs(CLI.Config.Import.Input)
 	case "config export":
