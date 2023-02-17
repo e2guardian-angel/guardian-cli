@@ -207,12 +207,14 @@ func AddHost(name string, host string, port uint16, username string, noPassword 
 	}
 	err = sshClient.CopyKeyToRemote(pair)
 	if err != nil {
+		log.Fatalf("Failed to copy keys: %s\n", err)
 		return -1
 	}
 
 	config.Hosts = append(config.Hosts, newHost)
 	err = writeConfig(config)
 	if err != nil {
+		log.Fatalf("Failed to write config: %s\n", err)
 		return -1
 	}
 
