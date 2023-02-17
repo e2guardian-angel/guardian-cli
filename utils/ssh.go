@@ -126,7 +126,7 @@ func appendToKnownHosts(line string) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.WriteString(line)
+	_, err = f.WriteString(fmt.Sprintf("%s\n", line))
 	if err != nil {
 		log.Fatal("Failed to append to known_hosts file: ", err)
 		return err
