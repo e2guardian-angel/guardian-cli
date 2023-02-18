@@ -98,6 +98,11 @@ func getHostDataDir(name string) string {
 	return path.Join(guardianHome, "host_data", name)
 }
 
+func getCaPathDir(name string) string {
+	hostData := getHostDataDir(name)
+	return path.Join(hostData, "rootCa.crt")
+}
+
 /*
  * Initialize local guardian config
  */

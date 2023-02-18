@@ -94,6 +94,9 @@ type FilterConfig struct {
 	// Redis config
 	RedisReplicas int    `yaml:"redisReplicas"`
 	RedisPassword string `yaml:"redisPassword"`
+	// Nginx
+	NginxReplicas int    `yaml:"nginxReplicas"`
+	WebCn         string `yaml:"webCn"`
 
 	// CI/CD
 	ReleaseTag string `yaml:"releaseTag,omitempty"`
@@ -1439,6 +1442,60 @@ func SetupCertificate(targetName string, cn string, org string, country string, 
 
 }
 
+func GetRootCa(targetName string) (string, error) {
+	config, err := loadConfig()
+	if err != nil {
+		return "", err
+	}
+
+	_, host := FindHost(config, targetName)
+	if host.Name != targetName {
+		log.Fatalf("host '%s' not configured", targetName)
+		return "", err
+	}
+
+	client, err := getHostSshClient(host)
+	if err != nil {
+		log.Fatal("Failed to create SSH connection: ", err)
+		return "", err
+	}
+	err = client.NewCryptoContext()
+	if err != nil {
+		log.Fatal("Failed to create SSH connection: ", err)
+		return "", err
+	}
+
+	certOutput, err := client.RunCommands([]string{
+		"kubectl -n filter get secret guardian-ca-tls -o jsonpath='{.data.ca\\.crt}' | base64 -d",
+	}, true)
+	if err != nil {
+		log.Fatal("Failed to run command: ", err)
+		return "", err
+	}
+
+	return certOutput, nil
+}
+
+func CopyRootCa(targetName string, outputPath string) int {
+	caPath := getCaPathDir(targetName)
+	data, err := ioutil.ReadFile(caPath)
+	if err != nil {
+		log.Fatal("Failed to open root CA, have you already deployed?")
+		return -1
+	}
+	f, err := os.Create(outputPath)
+	if err != nil {
+		log.Fatal("Failed to open output path for ca cert: ", err)
+		return -1
+	}
+	defer f.Close()
+	_, err = f.WriteString(string(data))
+	if err != nil {
+		log.Fatal("Failed to write ca certificate to disk: ", err)
+	}
+	return 0
+}
+
 /* Deploy changes to target */
 func Deploy(name string) int {
 
@@ -1484,6 +1541,25 @@ func Deploy(name string) int {
 	if err != nil {
 		log.Fatal("Failed to deploy filter config: ", err)
 		return -1
+	}
+
+	caCertOutputPath := getCaPathDir(name)
+	caCertData, err := GetRootCa(name)
+	if err != nil {
+		log.Fatalf("Failed to fetch the root CA: %s\n", err)
+		return -1
+	}
+
+	// Create caCert file
+	f, err := os.Create(caCertOutputPath)
+	if err != nil {
+		log.Fatal("Failed to create host filter config file: ", err)
+		return -1
+	}
+	defer f.Close()
+	_, err = f.WriteString(string(caCertData))
+	if err != nil {
+		log.Fatal("Failed to write ca certificate to disk: ", err)
 	}
 
 	fmt.Println("Deployment successful.")

@@ -149,6 +149,9 @@ var CLI struct {
 				Locality     string `name:"locality" help:"Locality (usually the city) for the certificate subject line" default:"Austin"`
 				Organization string `name:"organization" help:"Organization name for the certificate subject line" default:"Security"`
 			} `cmd:"" name:"configure" help:"Generates a new certificate/key pair for decryption"`
+			GetRootCa struct {
+				Output string `name:"output" help:"Output file path to export certificate to" required:"true"`
+			} `cmd:"" name:"get-root-ca" help:"Fetch the root CA certificate and output to a file"`
 		} `cmd:"" name:"certificate" help:"Manage decryption certificate"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
 	Config struct {
@@ -268,6 +271,8 @@ func main() {
 		code = utils.SetReleaseTag(target, CLI.Filter.ReleaseTag.Tag)
 	case "filter certificate configure":
 		code = utils.SetupCertificate(target, CLI.Filter.Certificate.Configure.CommonName, CLI.Filter.Certificate.Configure.Organization, CLI.Filter.Certificate.Configure.Country, CLI.Filter.Certificate.Configure.State, CLI.Filter.Certificate.Configure.Locality)
+	case "filter certificate get-root-ca":
+		code = utils.CopyRootCa(target, CLI.Filter.Certificate.GetRootCa.Output)
 	case "config import":
 		code = utils.ImportConfigs(CLI.Config.Import.Input)
 	case "config export":
