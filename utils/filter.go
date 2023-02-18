@@ -1467,7 +1467,7 @@ func GetRootCa(targetName string) (string, error) {
 
 	certOutput, err := client.RunCommands([]string{
 		"kubectl -n filter get secret guardian-ca-tls -o jsonpath='{.data.ca\\.crt}' | base64 -d",
-	}, true)
+	}, false)
 	if err != nil {
 		log.Fatal("Failed to run command: ", err)
 		return "", err
