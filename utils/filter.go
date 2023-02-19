@@ -73,6 +73,7 @@ type FilterConfig struct {
 	// Lookup service
 	GuardianReplicas int    `yaml:"guardianReplicas"`
 	AclVolumeSize    string `yaml:"aclVolumeSize"`
+	JwtPassword      string `yaml:"jwtPassword"`
 	// Filter
 	SquidPublicPort int              `yaml:"squidPublicPort"`
 	Transparent     bool             `yaml:"transparent"`
@@ -283,6 +284,7 @@ func initHostConfig(host Host) (FilterConfig, error) {
 
 		config.MasterNode = result.Items[0].Metadata.Name
 		config.VolumePath = getHostVolumePath(host)
+		config.JwtPassword = randomString(32)
 		config.RedisPassword = randomString(32)
 		config.DbPassword = randomString(32)
 
