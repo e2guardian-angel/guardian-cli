@@ -10,6 +10,14 @@ import (
 )
 
 var CLI struct {
+	Config struct {
+		Export struct {
+			Output string `name:"output" help:"Output file path to export to" required:"true"`
+		} `cmd:"" name:"export" help:"Exports config to file"`
+		Import struct {
+			Input string `name:"input" help:"Input file path to import from" required:"true"`
+		} `cmd:"" name:"import" help:"Imports config from file"`
+	} `cmd:"" help:"Export/Import configuration to file"`
 	Target struct {
 		Add struct {
 			Name       string `arg:"" name:"name" help:"Name to refer to target host" required:"true"`
@@ -19,6 +27,22 @@ var CLI struct {
 			NoPassword bool   `name:"no-password" help:"Don't use password auth for SSH key exchange" default:"false"`
 			HomePath   string `name:"home-path" help:"Custom home path on remote target installation"`
 		} `cmd:"" name:"add" help:"Add a target host for installation" required:"true"`
+		Delete struct {
+			Name string `arg:"" name:"name" help:"Name of target host to delete"`
+		} `cmd:"" name:"delete" help:"Deletes a target host"`
+		List struct {
+		} `cmd:"" name:"list" help:"List configured target hosts"`
+		Reset struct {
+		} `cmd:"" name:"reset" help:"Reset SSH and clear all hosts"`
+		Select struct {
+			Name string `arg:"" name:"name" help:"Name of target host to select"`
+		} `cmd:"" name:"select" help:"Select target for operations"`
+		Setup struct {
+			Name string `arg:"" name:"name" help:"Target to select for setup"`
+		} `cmd:"" name:"setup" help:"Setup dependencies on host"`
+		Test struct {
+			Name string `arg:"" name:"name" help:"Name of target host to test"`
+		} `cmd:"" name:"test" help:"Run test ssh command"`
 		Update struct {
 			Name       string `arg:"" name:"name" help:"Name of target host to update" required:"true"`
 			Host       string `arg:"" name:"host" help:"Target host address for install" type:"ip/hostname" required:"true"`
@@ -27,109 +51,19 @@ var CLI struct {
 			NoPassword bool   `name:"no-password" help:"Don't use password auth for SSH key exchange" default:"false"`
 			HomePath   string `name:"home-path" help:"Custom home path on remote target installation"`
 		} `cmd:"" name:"update" help:"Updates a target host for installation"`
-		Delete struct {
-			Name string `arg:"" name:"name" help:"Name of target host to delete"`
-		} `cmd:"" name:"delete" help:"Deletes a target host"`
-		Setup struct {
-			Name string `arg:"" name:"name" help:"Target to select for setup"`
-		} `cmd:"" name:"setup" help:"Setup dependencies on host"`
-		List struct {
-		} `cmd:"" name:"list" help:"List configured target hosts"`
-		Reset struct {
-		} `cmd:"" name:"reset" help:"Reset SSH and clear all hosts"`
-		Test struct {
-			Name string `arg:"" name:"name" help:"Name of target host to test"`
-		} `cmd:"" name:"test" help:"Run test ssh command"`
-		Select struct {
-			Name string `arg:"" name:"name" help:"Name of target host to select"`
-		} `cmd:"" name:"select" help:"Select target for operations"`
 	} `cmd:"" name:"target" help:"Operations on target hosts"`
 	Filter struct {
 		Target string `name:"target" help:"Name of target host for changes"`
-		Deploy struct {
-		} `cmd:"" name:"deploy" help:"Deploy filter stack to target host"`
-		Backup struct {
-			ToFile string `name:"to-file" help:"path to backup file" type:"filename" required:"true"`
-		} `cmd:"" name:"backup" help:"Backup target host's filter configuration"`
-		Restore struct {
-			FromFile string `name:"from-file" help:"Restore configuration from a backup file" type:"filename" required:"true"`
-		} `cmd:"" name:"restore" help:"Restore target host's filter configuration from a backup file"`
-		Uninstall struct {
-		} `cmd:"" name:"uninstall" help:"Uninstall filter stack on target host"`
-		SafeSearch struct {
-			Command string `arg:"" name:"command" help:"Safesearch is enforced (on/off/show)"`
-		} `cmd:"" name:"safe-search" help:"Safe search option"`
-		PhraseList struct {
-			AddPhrase struct {
-				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify" required:"true"`
-				Phrase string `arg:"" name:"phrase" help:"Phrase to add to the list" type:"comma separated list" required:"true"`
-				Group  string `name:"group" help:"name of phrase group"`
-				Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
-			} `cmd:"" name:"add-phrase" help:"Add a phrase to an existing list"`
-			Blacklist struct {
-				Name string `arg:"" name:"name" help:"Name of the phrase list to be blacklisted" required:"true"`
-			} `cmd:"" name:"blacklist" help:"blacklist this phrase list"`
-			Whitelist struct {
-				Name string `arg:"" name:"name" help:"Name of the phrase list to be whitelisted" required:"true"`
-			} `cmd:"" name:"whitelist" help:"whitelist this phrase list"`
-			Clear struct {
-				Name string `arg:"" name:"name" help:"Name of the phrase list to be cleared" required:"true"`
-			} `cmd:"" name:"clear" help:"remove this phrase list from whitelist/blacklist"`
-			RemovePhrase struct {
-				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
-				Phrase string `arg:"" name:"phrase" help:"Name of phrase list file include to delete" type:"comma separated list"`
-				Group  string `name:"group" help:"name of phrase group"`
-			} `cmd:"" name:"remove-phrase" help:"Remove a phrase from an existing list"`
-			AddList struct {
-				Name     string `arg:"" name:"name" help:"Name of the phrase list to create"`
-				Weighted bool   `name:"weighted" help:"phrase list is weighted" default:"false"`
-			} `cmd:"" name:"add-list" help:"Create a new phrase list"`
-			RemoveList struct {
-				Name string `arg:"" name:"name" help:"Name of the phrase list to delete"`
-			} `cmd:"" name:"remove-list" help:"Delete an existing phrase list"`
-			Show struct {
-				Name  string `name:"name" help:"Name of the phrase list to show"`
-				Group string `name:"group" help:"name of phrase group"`
-			} `cmd:"" name:"show" help:"Dump the contents of a phrase list"`
-		} `cmd:"" name:"phrase-list" help:"Configure phrase lists for content scanning"`
-		ContentList struct {
-			AddList struct {
-				Type string `arg:"" name:"type" help:"Type of list"`
-				Name string `arg:"" name:"name" help:"Name of the content list to create"`
-			} `cmd:"" name:"add-list" help:"Add a content list"`
-			RemoveList struct {
-				Name string `arg:"" name:"name" help:"Name of the content list to delete"`
-			} `cmd:"" name:"remove-list" help:"Delete an existing content list"`
-			AddEntry struct {
-				Name  string `arg:"" name:"name" help:"Name of the content list to modify"`
-				Entry string `arg:"" name:"entry" help:"Line to add to the content list" type:"string" required:"true"`
-				Group string `name:"group" help:"name of content group"`
-			} `cmd:"" name:"add-entry" help:"Add an entry to an existing content list"`
-			RemoveEntry struct {
-				Name  string `arg:"" name:"name" help:"Name of the content list to modify"`
-				Entry string `arg:"" name:"entry" help:"Entry to delete from content list" type:"string"`
-				Group string `name:"group" help:"name of content group"`
-			} `cmd:"" name:"remove-entry" help:"Remove an entry from an existing content list"`
-			Blacklist struct {
-				Name string `arg:"" name:"name" help:"Name of the content list to be blacklisted" required:"true"`
-			} `cmd:"" name:"blacklist" help:"Blacklist this content list"`
-			Whitelist struct {
-				Name string `arg:"" name:"name" help:"Name of the content list to be whitelisted" required:"true"`
-			} `cmd:"" name:"whitelist" help:"Whitelist this content list"`
-			Clear struct {
-				Name string `arg:"" name:"name" help:"Name of the content list to be cleared" required:"true"`
-			} `cmd:"" name:"clear" help:"Clear all includes from a content list"`
-			Show struct {
-				Name  string `name:"name" help:"Name of the content list to show"`
-				Group string `name:"group" help:"name of content group"`
-			} `cmd:"" name:"show" help:"Dump the contents of a content list"`
-		} `cmd:"" name:"content-list" help:"Configure content lists for content scanning"`
-		Acl struct {
+		Acl    struct {
 			AddRule struct {
 				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
 				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
 				Position int    `name:"position" help:"Position of rule in ordered acl list" default:"-1"`
 			} `cmd:"" name:"add" help:"Adds an ACL rule"`
+			CategorizeDomain struct {
+				Category string `arg:"" name:"category" help:"Category that a host belongs to"`
+				Domain   string `arg:"" name:"domain" help:"Domain to be categorized (i.e. google.com)"`
+			} `cmd:"" name:"categorize-domain" help:"Associate a domain with a category"`
 			DeleteRule struct {
 				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
 				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
@@ -138,9 +72,9 @@ var CLI struct {
 			Show struct {
 			} `cmd:"" name:"show" help:"Show all acl rules"`
 		} `cmd:"" name:"acl" help:"Configure acl lists for proxy"`
-		ReleaseTag struct {
-			Tag string `arg:"" name:"tag" help:"Name of tag to apply to images"`
-		} `cmd:"" name:"release-tag" help:"Release tag for CI/CD images"`
+		Backup struct {
+			ToFile string `name:"to-file" help:"path to backup file" type:"filename" required:"true"`
+		} `cmd:"" name:"backup" help:"Backup target host's filter configuration"`
 		Certificate struct {
 			Configure struct {
 				CommonName   string `name:"common-name" help:"Common Name for the certificate subject line" default:"guardian.angel"`
@@ -153,15 +87,85 @@ var CLI struct {
 				Output string `name:"output" help:"Output file path to export certificate to" required:"true"`
 			} `cmd:"" name:"get-root-ca" help:"Fetch the root CA certificate and output to a file"`
 		} `cmd:"" name:"certificate" help:"Manage decryption certificate"`
+		ContentList struct {
+			AddEntry struct {
+				Name  string `arg:"" name:"name" help:"Name of the content list to modify"`
+				Entry string `arg:"" name:"entry" help:"Line to add to the content list" type:"string" required:"true"`
+				Group string `name:"group" help:"name of content group"`
+			} `cmd:"" name:"add-entry" help:"Add an entry to an existing content list"`
+			AddList struct {
+				Type string `arg:"" name:"type" help:"Type of list"`
+				Name string `arg:"" name:"name" help:"Name of the content list to create"`
+			} `cmd:"" name:"add-list" help:"Add a content list"`
+			Blacklist struct {
+				Name string `arg:"" name:"name" help:"Name of the content list to be blacklisted" required:"true"`
+			} `cmd:"" name:"blacklist" help:"Blacklist this content list"`
+			Clear struct {
+				Name string `arg:"" name:"name" help:"Name of the content list to be cleared" required:"true"`
+			} `cmd:"" name:"clear" help:"Clear all includes from a content list"`
+			RemoveList struct {
+				Name string `arg:"" name:"name" help:"Name of the content list to delete"`
+			} `cmd:"" name:"remove-list" help:"Delete an existing content list"`
+			RemoveEntry struct {
+				Name  string `arg:"" name:"name" help:"Name of the content list to modify"`
+				Entry string `arg:"" name:"entry" help:"Entry to delete from content list" type:"string"`
+				Group string `name:"group" help:"name of content group"`
+			} `cmd:"" name:"remove-entry" help:"Remove an entry from an existing content list"`
+			Show struct {
+				Name  string `name:"name" help:"Name of the content list to show"`
+				Group string `name:"group" help:"name of content group"`
+			} `cmd:"" name:"show" help:"Dump the contents of a content list"`
+			Whitelist struct {
+				Name string `arg:"" name:"name" help:"Name of the content list to be whitelisted" required:"true"`
+			} `cmd:"" name:"whitelist" help:"Whitelist this content list"`
+		} `cmd:"" name:"content-list" help:"Configure content lists for content scanning"`
+		Deploy struct {
+		} `cmd:"" name:"deploy" help:"Deploy filter stack to target host"`
+		PhraseList struct {
+			AddList struct {
+				Name     string `arg:"" name:"name" help:"Name of the phrase list to create"`
+				Weighted bool   `name:"weighted" help:"phrase list is weighted" default:"false"`
+			} `cmd:"" name:"add-list" help:"Create a new phrase list"`
+			AddPhrase struct {
+				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify" required:"true"`
+				Phrase string `arg:"" name:"phrase" help:"Phrase to add to the list" type:"comma separated list" required:"true"`
+				Group  string `name:"group" help:"name of phrase group"`
+				Weight int    `name:"weight" help:"For weighted list, numeric weight associated with the phrase"`
+			} `cmd:"" name:"add-phrase" help:"Add a phrase to an existing list"`
+			Blacklist struct {
+				Name string `arg:"" name:"name" help:"Name of the phrase list to be blacklisted" required:"true"`
+			} `cmd:"" name:"blacklist" help:"blacklist this phrase list"`
+			Clear struct {
+				Name string `arg:"" name:"name" help:"Name of the phrase list to be cleared" required:"true"`
+			} `cmd:"" name:"clear" help:"remove this phrase list from whitelist/blacklist"`
+			RemovePhrase struct {
+				Name   string `arg:"" name:"name" help:"Name of the phrase list to modify"`
+				Phrase string `arg:"" name:"phrase" help:"Name of phrase list file include to delete" type:"comma separated list"`
+				Group  string `name:"group" help:"name of phrase group"`
+			} `cmd:"" name:"remove-phrase" help:"Remove a phrase from an existing list"`
+			RemoveList struct {
+				Name string `arg:"" name:"name" help:"Name of the phrase list to delete"`
+			} `cmd:"" name:"remove-list" help:"Delete an existing phrase list"`
+			Show struct {
+				Name  string `name:"name" help:"Name of the phrase list to show"`
+				Group string `name:"group" help:"name of phrase group"`
+			} `cmd:"" name:"show" help:"Dump the contents of a phrase list"`
+			Whitelist struct {
+				Name string `arg:"" name:"name" help:"Name of the phrase list to be whitelisted" required:"true"`
+			} `cmd:"" name:"whitelist" help:"whitelist this phrase list"`
+		} `cmd:"" name:"phrase-list" help:"Configure phrase lists for content scanning"`
+		ReleaseTag struct {
+			Tag string `arg:"" name:"tag" help:"Name of tag to apply to images"`
+		} `cmd:"" name:"release-tag" help:"Release tag for CI/CD images"`
+		Restore struct {
+			FromFile string `name:"from-file" help:"Restore configuration from a backup file" type:"filename" required:"true"`
+		} `cmd:"" name:"restore" help:"Restore target host's filter configuration from a backup file"`
+		SafeSearch struct {
+			Command string `arg:"" name:"command" help:"Safesearch is enforced (on/off/show)"`
+		} `cmd:"" name:"safe-search" help:"Safe search option"`
+		Uninstall struct {
+		} `cmd:"" name:"uninstall" help:"Uninstall filter stack on target host"`
 	} `cmd:"" help:"Deployment and configuration of the web filter"`
-	Config struct {
-		Export struct {
-			Output string `name:"output" help:"Output file path to export to" required:"true"`
-		} `cmd:"" name:"export" help:"Exports config to file"`
-		Import struct {
-			Input string `name:"input" help:"Input file path to import from" required:"true"`
-		} `cmd:"" name:"import" help:"Imports config from file"`
-	} `cmd:"" help:"Export/Import configuration to file"`
 }
 
 var listTypes = []string{"sitelist", "regexpurllist", "mimetypelist", "extensionslist"}
@@ -267,6 +271,8 @@ func main() {
 		code = utils.DeleteAclRule(CLI.Filter.Acl.DeleteRule.Category, CLI.Filter.Acl.DeleteRule.Action, target)
 	case "filter acl show":
 		code = utils.ShowAclRules(target)
+	case "filter acl categorize-domain <category> <domain>":
+		code = utils.Categorize(target, CLI.Filter.Acl.CategorizeDomain.Domain, CLI.Filter.Acl.CategorizeDomain.Category)
 	case "filter release-tag <tag>":
 		code = utils.SetReleaseTag(target, CLI.Filter.ReleaseTag.Tag)
 	case "filter certificate configure":

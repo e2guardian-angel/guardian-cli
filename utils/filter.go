@@ -1,23 +1,32 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"path"
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/golang-jwt/jwt/v4"
 	"gopkg.in/yaml.v2"
 )
 
 const helmChartGit = "https://github.com/e2guardian-angel/guardian-helm.git"
+
+type Claims struct {
+	Agent string `json:"agent"`
+	jwt.RegisteredClaims
+}
 
 type Phrase struct {
 	Phrase []string `yaml:"phrase"`
@@ -96,8 +105,9 @@ type FilterConfig struct {
 	RedisReplicas int    `yaml:"redisReplicas"`
 	RedisPassword string `yaml:"redisPassword"`
 	// Nginx
-	NginxReplicas int    `yaml:"nginxReplicas"`
-	WebCn         string `yaml:"webCn"`
+	NginxReplicas      int    `yaml:"nginxReplicas"`
+	WebCn              string `yaml:"webCn"`
+	WebHttpsPublicPort int    `yaml:"webHttpsPublicPort"`
 
 	// CI/CD
 	ReleaseTag string `yaml:"releaseTag,omitempty"`
@@ -108,6 +118,15 @@ type FilterConfig struct {
 	Country      string `yaml:"country"`
 	State        string `yaml:"state"`
 	Locality     string `yaml:"locality"`
+}
+
+type HostCategory struct {
+	Category string   `json:"category"`
+	Domains  []string `json:"domains"`
+}
+
+type CategoryList struct {
+	Categories []HostCategory `json:"categories"`
 }
 
 var ListTypes = []string{"sitelist", "regexpurllist", "mimetypelist", "extensionslist"}
@@ -221,6 +240,76 @@ func writeHostFilterConfig(host string, config FilterConfig) error {
 func getHostFilterConfigPath(host string) string {
 	hostDataDir := getHostDataDir(host)
 	return path.Join(hostDataDir, "overrides.yaml")
+}
+
+func getHostCategoryMapPath(host string) string {
+	hostDataDir := getHostDataDir(host)
+	return path.Join(hostDataDir, "categories.yaml")
+}
+
+/*
+ * load the category map
+ */
+func loadCategoryList(targetName string) (CategoryList, error) {
+	categoryMapPath := getHostCategoryMapPath(targetName)
+	data, err := ioutil.ReadFile(categoryMapPath)
+	if err != nil {
+		return CategoryList{}, err
+	}
+	var categoryList CategoryList
+	err = json.Unmarshal([]byte(data), &categoryList)
+	if err != nil {
+		log.Fatal("Failed to parse config file: ", err)
+		return CategoryList{}, err
+	}
+	return categoryList, err
+}
+
+/*
+ * Init category list
+ */
+func initCategoryList(targetName string) (CategoryList, error) {
+
+	categoryListPath := getHostCategoryMapPath(targetName)
+
+	_, err := os.Stat(categoryListPath)
+	if os.IsNotExist(err) {
+
+		// Create empty category list
+		newList := CategoryList{}
+		writeCategoryList(newList)
+		return newList, err
+
+	} else {
+		return loadCategoryList(targetName)
+	}
+
+}
+
+/*
+ * Write in-memory category map to file
+ */
+func writeCategoryList(categoryList CategoryList) error {
+
+	guardianHome := GuardianConfigHome()
+	listFile := path.Join(guardianHome, "config.json")
+
+	jsonString, err := json.Marshal(categoryList)
+	if err != nil {
+		log.Fatal("Failed to marshal default config: ", err)
+		return err
+	}
+
+	// Create config file
+	f, err := os.Create(listFile)
+	if err != nil {
+		log.Fatal("Failed to create category list file: ", err)
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(string(jsonString))
+
+	return err
 }
 
 func randomString(n int) string {
@@ -1498,6 +1587,81 @@ func CopyRootCa(targetName string, outputPath string) int {
 	return 0
 }
 
+func GetJwtToken(secret string) (string, error) {
+	expirationTime := time.Now().Add(1 * time.Hour)
+	claims := &Claims{
+		Agent:            "guardian-cli",
+		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(expirationTime)},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(secret)
+	if err == nil {
+		return "", err
+	}
+	return tokenString, nil
+}
+
+func CategorizeInDb(targetName string, path string, body string) error {
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	_, target := FindHost(config, targetName)
+	if target.Name != targetName {
+		return fmt.Errorf("host %s doesn't exist, create it first", targetName)
+	}
+
+	filterConfig, err := getHostFilterConfig(targetName)
+	if err != nil {
+		return err
+	}
+
+	token, err := GetJwtToken(filterConfig.JwtPassword)
+	if err != nil {
+		return err
+	}
+
+	jsonBody := []byte(body)
+	bodyReader := bytes.NewReader(jsonBody)
+	url := fmt.Sprintf("https://%s:%d/%s", target.Address, filterConfig.WebHttpsPublicPort, path)
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPost, url, bodyReader)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	} else if resp.StatusCode != 200 {
+		return fmt.Errorf("received code %d from server", resp.StatusCode)
+	}
+	return nil
+}
+
+func CategorizeHostInDb(targetName string, host string, category string) error {
+	return CategorizeInDb(targetName, "/api/addhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, host))
+}
+
+func Categorize(targetName string, domain string, category string) int {
+
+	// If stack is deployed, try to add to the database
+	certPath := getCaPathDir(targetName)
+	if certPath == "" {
+		log.Fatal("Stack has not been deployed; unable to create database entry")
+		return -1
+	}
+	err := CategorizeHostInDb(targetName, domain, category)
+	if err != nil {
+		log.Fatal("Failed to categorize domain in database: ", err)
+		return -1
+	}
+
+	return 0
+}
+
 /* Deploy changes to target */
 func Deploy(name string) int {
 
@@ -1536,7 +1700,7 @@ func Deploy(name string) int {
 	_, err = client.RunCommands([]string{
 		fmt.Sprintf("cd %s", getRemoteHelmPath(host)),
 		"export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
-		"helm upgrade --install --create-namespace -f overrides.yaml -n filter guardian-angel guardian-angel",
+		"helm upgrade --install --wait --create-namespace -f overrides.yaml -n filter guardian-angel guardian-angel",
 		"dd if=/dev/null of=overrides.yaml",
 		"rm overrides.yaml",
 	}, true)

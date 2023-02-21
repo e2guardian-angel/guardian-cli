@@ -265,7 +265,7 @@ func TestSshCommand(name string) int {
 	}
 
 	_, err = client.RunCommands([]string{
-		"ls -lh /",
+		"echo test",
 	}, true)
 	if err != nil {
 		log.Fatal("Failed to run command: ", err)
