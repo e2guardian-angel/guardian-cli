@@ -116,12 +116,13 @@ type FilterConfig struct {
 	ReleaseTag string `yaml:"releaseTag,omitempty"`
 
 	// Certificate
-	CommonName      string   `yaml:"commonName"`
-	Organization    string   `yaml:"organization"`
-	Country         string   `yaml:"country"`
-	State           string   `yaml:"state"`
-	Locality        string   `yaml:"locality"`
-	SubjectAltNames []string `yaml:"subjectAltNames"`
+	CommonName   string   `yaml:"commonName"`
+	Organization string   `yaml:"organization"`
+	Country      string   `yaml:"country"`
+	State        string   `yaml:"state"`
+	Locality     string   `yaml:"locality"`
+	IpSANs       []string `yaml:"IpSANs"`
+	DnsNames     []string `yaml:"dnsNames"`
 }
 
 type HostCategory struct {
@@ -380,7 +381,7 @@ func initHostConfig(host Host) (FilterConfig, error) {
 		config.JwtPassword = randomString(32)
 		config.RedisPassword = randomString(32)
 		config.DbPassword = randomString(32)
-		config.SubjectAltNames = append(config.SubjectAltNames, host.Address)
+		config.IpSANs = append(config.IpSANs, host.Address)
 
 		// Write config to file
 		err = writeHostFilterConfig(host.Name, config)
@@ -1599,8 +1600,9 @@ func GetJwtToken(secret string) (string, error) {
 		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(expirationTime)},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(secret)
-	if err == nil {
+	jwtKey := []byte(secret)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
 		return "", err
 	}
 	return tokenString, nil
