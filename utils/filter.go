@@ -2,8 +2,11 @@ package utils
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -1603,7 +1606,47 @@ func GetJwtToken(secret string) (string, error) {
 	return tokenString, nil
 }
 
+func AddRootCa(targetName string) (*http.Transport, error) {
+	insecure := flag.Bool("insecure-ssl", false, "Accept/Ignore all server SSL certificates")
+	flag.Parse()
+
+	// If stack is deployed, try to add to the database
+	rootCaPath := getCaPathDir(targetName)
+	if rootCaPath == "" {
+		return nil, errors.New("Stack has not been deployed; unable to add root CA")
+	}
+
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+	// Read in the cert file
+	certs, err := ioutil.ReadFile(rootCaPath)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to append %q to RootCAs: %v", rootCaPath, err)
+	}
+
+	// Append our cert to the system pool
+	if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
+		return nil, errors.New("No certs appended")
+	}
+
+	// Trust the augmented cert pool in our client
+	config := &tls.Config{
+		InsecureSkipVerify: *insecure,
+		RootCAs:            rootCAs,
+	}
+	tr := &http.Transport{TLSClientConfig: config}
+
+	return tr, nil
+}
+
 func CategorizeInDb(targetName string, path string, body string) error {
+	tr, err := AddRootCa(targetName)
+	if err != nil {
+		return err
+	}
+
 	config, err := loadConfig()
 	if err != nil {
 		return err
@@ -1627,7 +1670,7 @@ func CategorizeInDb(targetName string, path string, body string) error {
 	jsonBody := []byte(body)
 	bodyReader := bytes.NewReader(jsonBody)
 	url := fmt.Sprintf("https://%s:%d/%s", target.Address, filterConfig.WebHttpsPublicPort, path)
-	client := &http.Client{}
+	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest(http.MethodPost, url, bodyReader)
 	if err != nil {
 		return err
@@ -1649,12 +1692,6 @@ func CategorizeHostInDb(targetName string, host string, category string) error {
 
 func Categorize(targetName string, domain string, category string) int {
 
-	// If stack is deployed, try to add to the database
-	certPath := getCaPathDir(targetName)
-	if certPath == "" {
-		log.Fatal("Stack has not been deployed; unable to create database entry")
-		return -1
-	}
 	err := CategorizeHostInDb(targetName, domain, category)
 	if err != nil {
 		log.Fatal("Failed to categorize domain in database: ", err)
