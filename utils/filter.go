@@ -1669,7 +1669,7 @@ func CategorizeInDb(targetName string, path string, body string) error {
 
 	jsonBody := []byte(body)
 	bodyReader := bytes.NewReader(jsonBody)
-	url := fmt.Sprintf("https://%s:%d/%s", target.Address, filterConfig.WebHttpsPublicPort, path)
+	url := fmt.Sprintf("https://%s:%d%s", target.Address, filterConfig.WebHttpsPublicPort, path)
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest(http.MethodPost, url, bodyReader)
 	if err != nil {
