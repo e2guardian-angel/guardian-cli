@@ -113,11 +113,12 @@ type FilterConfig struct {
 	ReleaseTag string `yaml:"releaseTag,omitempty"`
 
 	// Certificate
-	CommonName   string `yaml:"commonName"`
-	Organization string `yaml:"organization"`
-	Country      string `yaml:"country"`
-	State        string `yaml:"state"`
-	Locality     string `yaml:"locality"`
+	CommonName      string   `yaml:"commonName"`
+	Organization    string   `yaml:"organization"`
+	Country         string   `yaml:"country"`
+	State           string   `yaml:"state"`
+	Locality        string   `yaml:"locality"`
+	SubjectAltNames []string `yaml:"subjectAltNames"`
 }
 
 type HostCategory struct {
@@ -376,6 +377,7 @@ func initHostConfig(host Host) (FilterConfig, error) {
 		config.JwtPassword = randomString(32)
 		config.RedisPassword = randomString(32)
 		config.DbPassword = randomString(32)
+		config.SubjectAltNames = append(config.SubjectAltNames, host.Address)
 
 		// Write config to file
 		err = writeHostFilterConfig(host.Name, config)
