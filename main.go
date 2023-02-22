@@ -64,6 +64,10 @@ var CLI struct {
 				Category string `arg:"" name:"category" help:"Category that a host belongs to"`
 				Domain   string `arg:"" name:"domain" help:"Domain to be categorized (i.e. google.com)"`
 			} `cmd:"" name:"categorize-domain" help:"Associate a domain with a category"`
+			DecategorizeDomain struct {
+				Category string `arg:"" name:"category" help:"Category that a host belongs to"`
+				Domain   string `arg:"" name:"domain" help:"Domain to be decategorized (i.e. google.com)"`
+			} `cmd:"" name:"decategorize-domain" help:"Remove association of a domain with a category"`
 			DeleteRule struct {
 				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
 				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
@@ -273,6 +277,8 @@ func main() {
 		code = utils.ShowAclRules(target)
 	case "filter acl categorize-domain <category> <domain>":
 		code = utils.Categorize(target, CLI.Filter.Acl.CategorizeDomain.Domain, CLI.Filter.Acl.CategorizeDomain.Category)
+	case "filter acl decategorize-domain <category> <domain>":
+		code = utils.DeCategorize(target, CLI.Filter.Acl.CategorizeDomain.Domain, CLI.Filter.Acl.CategorizeDomain.Category)
 	case "filter release-tag <tag>":
 		code = utils.SetReleaseTag(target, CLI.Filter.ReleaseTag.Tag)
 	case "filter certificate configure":

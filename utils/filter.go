@@ -1615,7 +1615,7 @@ func AddRootCa(targetName string) (*http.Transport, error) {
 	// If stack is deployed, try to add to the database
 	rootCaPath := getCaPathDir(targetName)
 	if rootCaPath == "" {
-		return nil, errors.New("Stack has not been deployed; unable to add root CA")
+		return nil, errors.New("stack has not been deployed; unable to add root CA")
 	}
 
 	rootCAs, _ := x509.SystemCertPool()
@@ -1625,12 +1625,12 @@ func AddRootCa(targetName string) (*http.Transport, error) {
 	// Read in the cert file
 	certs, err := ioutil.ReadFile(rootCaPath)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to append %q to RootCAs: %v", rootCaPath, err)
+		return nil, fmt.Errorf("failed to append %q to RootCAs: %v", rootCaPath, err)
 	}
 
 	// Append our cert to the system pool
 	if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
-		return nil, errors.New("No certs appended")
+		return nil, errors.New("no certs appended")
 	}
 
 	// Trust the augmented cert pool in our client
@@ -1643,7 +1643,7 @@ func AddRootCa(targetName string) (*http.Transport, error) {
 	return tr, nil
 }
 
-func CategorizeInDb(targetName string, path string, body string) error {
+func ApiCall(targetName string, path string, body string) error {
 	tr, err := AddRootCa(targetName)
 	if err != nil {
 		return err
@@ -1688,15 +1688,22 @@ func CategorizeInDb(targetName string, path string, body string) error {
 	return nil
 }
 
-func CategorizeHostInDb(targetName string, host string, category string) error {
-	return CategorizeInDb(targetName, "/api/addhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, host))
-}
-
 func Categorize(targetName string, domain string, category string) int {
 
-	err := CategorizeHostInDb(targetName, domain, category)
+	err := ApiCall(targetName, "/api/addhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
 	if err != nil {
 		log.Fatal("Failed to categorize domain in database: ", err)
+		return -1
+	}
+
+	return 0
+}
+
+func DeCategorize(targetName string, domain string, category string) int {
+
+	err := ApiCall(targetName, "/api/delhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
+	if err != nil {
+		log.Fatal("Failed to decategorize domain in database: ", err)
 		return -1
 	}
 
