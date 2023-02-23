@@ -60,6 +60,13 @@ var CLI struct {
 				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
 				Position int    `name:"position" help:"Position of rule in ordered acl list" default:"-1"`
 			} `cmd:"" name:"add" help:"Adds an ACL rule"`
+			DeleteRule struct {
+				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
+				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
+				Position int    `name:"position" help:"Position of rule in ordered acl list" default:"-1"`
+			} `cmd:"" name:"delete" help:"Deletes an ACL rule"`
+			Show struct {
+			} `cmd:"" name:"show" help:"Show all acl rules"`
 			CategorizeDomain struct {
 				Category string `arg:"" name:"category" help:"Category that a host belongs to"`
 				Domain   string `arg:"" name:"domain" help:"Domain to be categorized (i.e. google.com)"`
@@ -68,13 +75,14 @@ var CLI struct {
 				Category string `arg:"" name:"category" help:"Category that a host belongs to"`
 				Domain   string `arg:"" name:"domain" help:"Domain to be decategorized (i.e. google.com)"`
 			} `cmd:"" name:"decategorize-domain" help:"Remove association of a domain with a category"`
-			DeleteRule struct {
-				Category string `arg:"" name:"category" help:"ACL rule category" required:"true"`
-				Action   string `arg:"" name:"action" help:"ACL rule action (allow, deny, decrypt, nodecrypt)" required:"true"`
-				Position int    `name:"position" help:"Position of rule in ordered acl list" default:"-1"`
-			} `cmd:"" name:"delete" help:"Deletes an ACL rule"`
-			Show struct {
-			} `cmd:"" name:"show" help:"Show all acl rules"`
+			ListCategories struct {
+				Domain string `name:"domain" help:"Optional: show only categories that a domain belongs to" default:""`
+			} `cmd:"" name:"list-categories" help:"List all existing categories in the database"`
+			DeleteCategory struct {
+				Category string `arg:"" name:"category" help:"Domain category to be deleted"`
+			} `cmd:"" name:"delete-category" help:"Delete a domain category"`
+			ClearDatabase struct {
+			} `cmd:"" name:"clear-database" help:"Clear the domain category database"`
 		} `cmd:"" name:"acl" help:"Configure acl lists for proxy"`
 		Backup struct {
 			ToFile string `name:"to-file" help:"path to backup file" type:"filename" required:"true"`
@@ -278,7 +286,13 @@ func main() {
 	case "filter acl categorize-domain <category> <domain>":
 		code = utils.Categorize(target, CLI.Filter.Acl.CategorizeDomain.Domain, CLI.Filter.Acl.CategorizeDomain.Category)
 	case "filter acl decategorize-domain <category> <domain>":
-		code = utils.DeCategorize(target, CLI.Filter.Acl.CategorizeDomain.Domain, CLI.Filter.Acl.CategorizeDomain.Category)
+		code = utils.DeCategorize(target, CLI.Filter.Acl.DecategorizeDomain.Domain, CLI.Filter.Acl.DecategorizeDomain.Category)
+	case "filter acl delete-category <category>":
+		code = utils.DeleteCategory(target, CLI.Filter.Acl.DeleteCategory.Category)
+	case "filter acl clear-database <category>":
+		code = utils.ClearAll(target)
+	case "filter acl list-categories":
+		code = utils.ListCategory(target, CLI.Filter.Acl.ListCategories.Domain)
 	case "filter release-tag <tag>":
 		code = utils.SetReleaseTag(target, CLI.Filter.ReleaseTag.Tag)
 	case "filter certificate configure":

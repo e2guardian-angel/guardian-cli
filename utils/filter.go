@@ -1643,7 +1643,50 @@ func AddRootCa(targetName string) (*http.Transport, error) {
 	return tr, nil
 }
 
-func ApiCall(targetName string, path string, body string) error {
+func ApiGet(targetName string, path string) error {
+	tr, err := AddRootCa(targetName)
+	if err != nil {
+		return err
+	}
+
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	_, target := FindHost(config, targetName)
+	if target.Name != targetName {
+		return fmt.Errorf("host %s doesn't exist, create it first", targetName)
+	}
+
+	filterConfig, err := getHostFilterConfig(targetName)
+	if err != nil {
+		return err
+	}
+
+	token, err := GetJwtToken(filterConfig.JwtPassword)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("https://%s:%d%s", target.Address, filterConfig.WebHttpsPublicPort, path)
+	client := &http.Client{Transport: tr}
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	} else if resp.StatusCode != 200 {
+		return fmt.Errorf("received code %d from server", resp.StatusCode)
+	}
+	return nil
+}
+
+func ApiPost(targetName string, path string, body string) error {
 	tr, err := AddRootCa(targetName)
 	if err != nil {
 		return err
@@ -1690,7 +1733,7 @@ func ApiCall(targetName string, path string, body string) error {
 
 func Categorize(targetName string, domain string, category string) int {
 
-	err := ApiCall(targetName, "/api/addhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
+	err := ApiPost(targetName, "/api/addhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
 	if err != nil {
 		log.Fatal("Failed to categorize domain in database: ", err)
 		return -1
@@ -1701,9 +1744,46 @@ func Categorize(targetName string, domain string, category string) int {
 
 func DeCategorize(targetName string, domain string, category string) int {
 
-	err := ApiCall(targetName, "/api/delhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
+	err := ApiPost(targetName, "/api/delhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
 	if err != nil {
 		log.Fatal("Failed to decategorize domain in database: ", err)
+		return -1
+	}
+
+	return 0
+}
+
+func ListCategory(targetName string, domain string) int {
+
+	body := ""
+	if domain != "" {
+		body = fmt.Sprintf("{\"hostname\": \"%s\"}", domain)
+	}
+	err := ApiPost(targetName, "/api/listCategories", body)
+	if err != nil {
+		log.Fatal("Failed to list categories in database: ", err)
+		return -1
+	}
+
+	return 0
+}
+
+func DeleteCategory(targetName string, category string) int {
+
+	err := ApiPost(targetName, "/api/deletecategory", fmt.Sprintf("{\"category\": \"%s\"}", category))
+	if err != nil {
+		log.Fatal("Failed to delete category in database: ", err)
+		return -1
+	}
+
+	return 0
+}
+
+func ClearAll(targetName string) int {
+
+	err := ApiGet(targetName, "/api/cleanup")
+	if err != nil {
+		log.Fatal("Failed to clear the database: ", err)
 		return -1
 	}
 
