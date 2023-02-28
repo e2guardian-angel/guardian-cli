@@ -83,6 +83,12 @@ var CLI struct {
 			} `cmd:"" name:"delete-category" help:"Delete a domain category"`
 			ClearDatabase struct {
 			} `cmd:"" name:"clear-database" help:"Clear the domain category database"`
+			Upload struct {
+				File string `name:"file" help:"Tar file to upload"`
+			} `cmd:"" name:"upload" help:"Upload and install a tarball containing squidguard style lists"`
+			Download struct {
+				File string `name:"file" help:"Output of downloaded tar file"`
+			} `cmd:"" name:"download" help:"Generate and download a tarball containing squidguard-style lists of existing category db"`
 		} `cmd:"" name:"acl" help:"Configure acl lists for proxy"`
 		Backup struct {
 			ToFile string `name:"to-file" help:"path to backup file" type:"filename" required:"true"`
@@ -293,6 +299,10 @@ func main() {
 		code = utils.ClearAll(target)
 	case "filter acl list-categories":
 		code = utils.ListCategory(target, CLI.Filter.Acl.ListCategories.Domain)
+	case "filter acl upload":
+		code = utils.InstallLists(target, CLI.Filter.Acl.Upload.File)
+	case "filter acl download":
+		code = utils.GenerateAndDownload(target, CLI.Filter.Acl.Download.File)
 	case "filter release-tag <tag>":
 		code = utils.SetReleaseTag(target, CLI.Filter.ReleaseTag.Tag)
 	case "filter certificate configure":

@@ -8,12 +8,15 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -25,6 +28,9 @@ import (
 )
 
 const helmChartGit = "https://github.com/e2guardian-angel/guardian-helm.git"
+
+// global http transport
+var customHttpTransport *http.Transport
 
 type Claims struct {
 	Agent string `json:"agent"`
@@ -245,76 +251,6 @@ func writeHostFilterConfig(host string, config FilterConfig) error {
 func getHostFilterConfigPath(host string) string {
 	hostDataDir := getHostDataDir(host)
 	return path.Join(hostDataDir, "overrides.yaml")
-}
-
-func getHostCategoryMapPath(host string) string {
-	hostDataDir := getHostDataDir(host)
-	return path.Join(hostDataDir, "categories.yaml")
-}
-
-/*
- * load the category map
- */
-func loadCategoryList(targetName string) (CategoryList, error) {
-	categoryMapPath := getHostCategoryMapPath(targetName)
-	data, err := ioutil.ReadFile(categoryMapPath)
-	if err != nil {
-		return CategoryList{}, err
-	}
-	var categoryList CategoryList
-	err = json.Unmarshal([]byte(data), &categoryList)
-	if err != nil {
-		log.Fatal("Failed to parse config file: ", err)
-		return CategoryList{}, err
-	}
-	return categoryList, err
-}
-
-/*
- * Init category list
- */
-func initCategoryList(targetName string) (CategoryList, error) {
-
-	categoryListPath := getHostCategoryMapPath(targetName)
-
-	_, err := os.Stat(categoryListPath)
-	if os.IsNotExist(err) {
-
-		// Create empty category list
-		newList := CategoryList{}
-		writeCategoryList(newList)
-		return newList, err
-
-	} else {
-		return loadCategoryList(targetName)
-	}
-
-}
-
-/*
- * Write in-memory category map to file
- */
-func writeCategoryList(categoryList CategoryList) error {
-
-	guardianHome := GuardianConfigHome()
-	listFile := path.Join(guardianHome, "config.json")
-
-	jsonString, err := json.Marshal(categoryList)
-	if err != nil {
-		log.Fatal("Failed to marshal default config: ", err)
-		return err
-	}
-
-	// Create config file
-	f, err := os.Create(listFile)
-	if err != nil {
-		log.Fatal("Failed to create category list file: ", err)
-		return err
-	}
-	defer f.Close()
-	_, err = f.WriteString(string(jsonString))
-
-	return err
 }
 
 func randomString(n int) string {
@@ -1609,107 +1545,110 @@ func GetJwtToken(secret string) (string, error) {
 }
 
 func AddRootCa(targetName string) (*http.Transport, error) {
-	insecure := flag.Bool("insecure-ssl", false, "Accept/Ignore all server SSL certificates")
-	flag.Parse()
 
-	// If stack is deployed, try to add to the database
-	rootCaPath := getCaPathDir(targetName)
-	if rootCaPath == "" {
-		return nil, errors.New("stack has not been deployed; unable to add root CA")
+	if customHttpTransport == nil {
+		insecure := flag.Bool("insecure-ssl", false, "Accept/Ignore all server SSL certificates")
+		flag.Parse()
+
+		// If stack is deployed, try to add to the database
+		rootCaPath := getCaPathDir(targetName)
+		if rootCaPath == "" {
+			return nil, errors.New("stack has not been deployed; unable to add root CA")
+		}
+
+		rootCAs, _ := x509.SystemCertPool()
+		if rootCAs == nil {
+			rootCAs = x509.NewCertPool()
+		}
+		// Read in the cert file
+		certs, err := ioutil.ReadFile(rootCaPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to append %q to RootCAs: %v", rootCaPath, err)
+		}
+
+		// Append our cert to the system pool
+		if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
+			return nil, errors.New("no certs appended")
+		}
+
+		// Trust the augmented cert pool in our client
+		config := &tls.Config{
+			InsecureSkipVerify: *insecure,
+			RootCAs:            rootCAs,
+		}
+		customHttpTransport = &http.Transport{TLSClientConfig: config}
 	}
 
-	rootCAs, _ := x509.SystemCertPool()
-	if rootCAs == nil {
-		rootCAs = x509.NewCertPool()
-	}
-	// Read in the cert file
-	certs, err := ioutil.ReadFile(rootCaPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to append %q to RootCAs: %v", rootCaPath, err)
-	}
-
-	// Append our cert to the system pool
-	if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
-		return nil, errors.New("no certs appended")
-	}
-
-	// Trust the augmented cert pool in our client
-	config := &tls.Config{
-		InsecureSkipVerify: *insecure,
-		RootCAs:            rootCAs,
-	}
-	tr := &http.Transport{TLSClientConfig: config}
-
-	return tr, nil
+	return customHttpTransport, nil
 }
 
-func ApiGet(targetName string, path string) error {
+func ApiGet(targetName string, path string) (*http.Response, error) {
 	tr, err := AddRootCa(targetName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	config, err := loadConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_, target := FindHost(config, targetName)
 	if target.Name != targetName {
-		return fmt.Errorf("host %s doesn't exist, create it first", targetName)
+		return nil, fmt.Errorf("host %s doesn't exist, create it first", targetName)
 	}
 
 	filterConfig, err := getHostFilterConfig(targetName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	token, err := GetJwtToken(filterConfig.JwtPassword)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	url := fmt.Sprintf("https://%s:%d%s", target.Address, filterConfig.WebHttpsPublicPort, path)
 	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest(http.MethodPost, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	} else if resp.StatusCode != 200 {
-		return fmt.Errorf("received code %d from server", resp.StatusCode)
+		return nil, fmt.Errorf("received code %d from server", resp.StatusCode)
 	}
-	return nil
+	return resp, nil
 }
 
-func ApiPost(targetName string, path string, body string) error {
+func ApiPost(targetName string, path string, body string) (*http.Response, error) {
 	tr, err := AddRootCa(targetName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	config, err := loadConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_, target := FindHost(config, targetName)
 	if target.Name != targetName {
-		return fmt.Errorf("host %s doesn't exist, create it first", targetName)
+		return nil, fmt.Errorf("host %s doesn't exist, create it first", targetName)
 	}
 
 	filterConfig, err := getHostFilterConfig(targetName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	token, err := GetJwtToken(filterConfig.JwtPassword)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	jsonBody := []byte(body)
@@ -1718,40 +1657,133 @@ func ApiPost(targetName string, path string, body string) error {
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest(http.MethodPost, url, bodyReader)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	} else if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("received code %d from server", resp.StatusCode)
+	}
+	return resp, nil
+}
+
+func Upload(targetName string, urlPath string, filePath string) error {
+
+	// Prepare multipart writer
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("listfile", filepath.Base(file.Name()))
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return err
+	}
+	err = writer.Close()
+	if err != nil {
+		return err
+	}
+
+	tr, err := AddRootCa(targetName)
+	if err != nil {
+		return err
+	}
+
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	_, target := FindHost(config, targetName)
+	if target.Name != targetName {
+		return fmt.Errorf("host %s doesn't exist, create it first", targetName)
+	}
+
+	filterConfig, err := getHostFilterConfig(targetName)
+	if err != nil {
+		return err
+	}
+
+	token, err := GetJwtToken(filterConfig.JwtPassword)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("https://%s:%d%s", target.Address, filterConfig.WebHttpsPublicPort, urlPath)
+	client := &http.Client{Transport: tr}
+	req, err := http.NewRequest(http.MethodPost, url, body)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	} else if resp.StatusCode > 200 {
 		return fmt.Errorf("received code %d from server", resp.StatusCode)
 	}
+	fmt.Println("OK")
+	return nil
+}
+
+func Download(targetName string, urlPath string, fileName string) error {
+
+	// Create blank file
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err := ApiGet(targetName, urlPath)
+	if err != nil {
+		return err
+	}
+
+	// Copy response to file
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed writing output file: %s", err)
+	}
+
 	return nil
 }
 
 func Categorize(targetName string, domain string, category string) int {
 
-	err := ApiPost(targetName, "/api/addhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
+	_, err := ApiPost(targetName, "/api/addhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
 	if err != nil {
 		log.Fatal("Failed to categorize domain in database: ", err)
 		return -1
 	}
+	log.Println("OK")
 
 	return 0
 }
 
 func DeCategorize(targetName string, domain string, category string) int {
 
-	err := ApiPost(targetName, "/api/delhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
+	_, err := ApiPost(targetName, "/api/delhost", fmt.Sprintf("{\"category\": \"%s\", \"hostname\": \"%s\"}", category, domain))
 	if err != nil {
 		log.Fatal("Failed to decategorize domain in database: ", err)
 		return -1
 	}
+	log.Println("OK")
 
 	return 0
 }
+
+type CatList []string
 
 func ListCategory(targetName string, domain string) int {
 
@@ -1759,18 +1791,30 @@ func ListCategory(targetName string, domain string) int {
 	if domain != "" {
 		body = fmt.Sprintf("{\"hostname\": \"%s\"}", domain)
 	}
-	err := ApiPost(targetName, "/api/listCategories", body)
+	resp, err := ApiPost(targetName, "/api/listCategories", body)
 	if err != nil {
-		log.Fatal("Failed to list categories in database: ", err)
+		log.Fatal("failed to list categories in database: ", err)
 		return -1
 	}
+	resBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal("failed to read body: ", err)
+	}
+	var categories CatList
+	json.Unmarshal(resBody, &categories)
+
+	fmt.Println("[")
+	for _, category := range categories {
+		fmt.Printf("\t%s\n", category)
+	}
+	fmt.Println("]")
 
 	return 0
 }
 
 func DeleteCategory(targetName string, category string) int {
 
-	err := ApiPost(targetName, "/api/deletecategory", fmt.Sprintf("{\"category\": \"%s\"}", category))
+	_, err := ApiPost(targetName, "/api/deletecategory", fmt.Sprintf("{\"category\": \"%s\"}", category))
 	if err != nil {
 		log.Fatal("Failed to delete category in database: ", err)
 		return -1
@@ -1781,10 +1825,78 @@ func DeleteCategory(targetName string, category string) int {
 
 func ClearAll(targetName string) int {
 
-	err := ApiGet(targetName, "/api/cleanup")
+	_, err := ApiGet(targetName, "/api/cleanup")
 	if err != nil {
 		log.Fatal("Failed to clear the database: ", err)
 		return -1
+	}
+
+	return 0
+}
+
+func InstallLists(targetName string, filePath string) int {
+
+	err := Upload(targetName, "/api/upload", filePath)
+	if err != nil {
+		log.Fatalf("Failed to upload list file: %s", err)
+		return -1
+	}
+
+	return 0
+
+}
+
+type ListStatus struct {
+	Loading    bool   `json:"loading"`
+	Generating bool   `json:"generating"`
+	GenFile    string `json:"genFile"`
+	CreatedAt  string `json:"createdAt"`
+	Err        string `json:"err"`
+}
+
+func GenerateAndDownload(targetName string, filePath string) int {
+
+	_, err := ApiGet(targetName, "/api/generateLists")
+	if err != nil {
+		log.Fatalf("Failed to generate list file: %s", err)
+	}
+	//err := errors.New("blah")
+
+	// Wait until file is ready
+	ready := false
+	retry := 0
+	maxRetries := 900
+	for !ready && retry < maxRetries {
+		resp, err := ApiGet(targetName, "/api/getListStatus")
+		if err == nil {
+			// TODO: check resp
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatalf("Failed to get lists status: %s", err)
+			}
+			var status ListStatus
+			json.Unmarshal(body, &status)
+			if !status.Generating {
+				if status.GenFile != "" {
+					ready = true
+				} else if status.Err != "" {
+					log.Fatalf("Lists generation failed with error: %s\n", status.Err)
+					return -1
+				}
+			} else {
+				log.Println("Lists file is still being generated...")
+			}
+		} else {
+			log.Fatalf("failed to get lists status: %s\n", err)
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	log.Println("Downloading lists file...")
+	// TODO: write download function and call it here
+	err = Download(targetName, "/api/download", filePath)
+	if err != nil {
+		log.Fatalf("downloading lists file failed: %s", err)
 	}
 
 	return 0
