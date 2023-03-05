@@ -49,6 +49,8 @@ github.com/justinschw/gofigure v1.0.1 h1:PoO3nucq20FvG9QdlZYkUuf4f5lUEjiE5dG0hgk
 github.com/justinschw/gofigure v1.0.1/go.mod h1:QhsYyWWTCOXbrreNrFzCTpAeobegjyM8YywAyRAK80A=
 github.com/justinschw/gofigure v1.0.2 h1:Gm/bXoGfcT8TQ1TQMvjQOcvLFHhYHyOr3pM0kvXcS8s=
 github.com/justinschw/gofigure v1.0.2/go.mod h1:UNH8wtIYlcsanIe1Rmgd/fut0vHTzvZhuV/Mzgr+X/0=
+github.com/justinschw/gofigure v1.0.3 h1:uagw5ZK+8dI8/c39BFJWtoitoYPzHkKV2MkyRl6h54c=
+github.com/justinschw/gofigure v1.0.3/go.mod h1:UNH8wtIYlcsanIe1Rmgd/fut0vHTzvZhuV/Mzgr+X/0=
 github.com/kevinburke/ssh_config v0.0.0-20201106050909-4977a11b4351 h1:DowS9hvgyYSX4TO5NpyC606/Z4SxnNYbT+WX27or6Ck=
 github.com/kevinburke/ssh_config v0.0.0-20201106050909-4977a11b4351/go.mod h1:CT57kijsi8u/K/BOFA39wgDQJ9CxiF4nAY/ojJ6r6mM=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
